@@ -17,6 +17,7 @@ from gmail_mcp.utils.config import get_config
 from gmail_mcp.utils.logger import setup_logger
 from gmail_mcp.auth.oauth import setup_oauth_routes
 from gmail_mcp.gmail.client import setup_gmail_tools
+from gmail_mcp.mcp.server import setup_mcp_handlers
 
 # Load environment variables
 load_dotenv()
@@ -42,6 +43,9 @@ setup_oauth_routes(mcp)
 
 # Setup Gmail tools
 setup_gmail_tools(mcp)
+
+# Setup additional MCP handlers
+setup_mcp_handlers(mcp)
 
 # Health check resource
 @mcp.resource("health://")

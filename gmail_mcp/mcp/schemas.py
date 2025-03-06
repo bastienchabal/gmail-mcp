@@ -1,15 +1,69 @@
 """
-MCP Schemas Module
+Gmail MCP Data Models
 
-This module defines the Pydantic models for MCP requests and responses.
+This module defines data models for the Gmail MCP server.
+FastMCP handles the core MCP protocol schemas automatically.
 """
 
 from typing import Dict, Any, List, Optional, Union
-from enum import Enum
 from datetime import datetime
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
+
+
+class EmailMetadata(BaseModel):
+    """Model for email metadata."""
+    
+    id: str
+    thread_id: str
+    subject: str
+    from_email: str
+    from_name: Optional[str] = None
+    to: List[str]
+    cc: Optional[List[str]] = None
+    bcc: Optional[List[str]] = None
+    date: datetime
+    labels: List[str] = Field(default_factory=list)
+    has_attachments: bool = False
+
+
+class EmailContent(BaseModel):
+    """Model for email content."""
+    
+    plain_text: str
+    html: Optional[str] = None
+
+
+class Thread(BaseModel):
+    """Model for email thread."""
+    
+    id: str
+    subject: str
+    messages: List[str]
+    participants: List[str]
+    last_message_date: datetime
+    message_count: int
+
+
+class Sender(BaseModel):
+    """Model for email sender."""
+    
+    email: str
+    name: Optional[str] = None
+    message_count: int = 0
+    first_message_date: Optional[datetime] = None
+    last_message_date: Optional[datetime] = None
+    common_topics: List[str] = Field(default_factory=list)
+
+
+class SearchResult(BaseModel):
+    """Model for search results."""
+    
+    query: str
+    results: List[EmailMetadata] = Field(default_factory=list)
+    total_results: int = 0
+    next_page_token: Optional[str] = None
 
 
 class ContextItem(BaseModel):
@@ -76,30 +130,6 @@ class SearchResponse(BaseModel):
     response_id: str = Field(default_factory=lambda: str(uuid4()))
     content: str
     context: List[ContextItem] = Field(default_factory=list)
-
-
-# Email-specific context item models
-class EmailMetadata(BaseModel):
-    """Model for email metadata."""
-    
-    id: str
-    thread_id: str
-    subject: str
-    from_email: str
-    from_name: Optional[str] = None
-    to: List[str]
-    cc: Optional[List[str]] = None
-    bcc: Optional[List[str]] = None
-    date: datetime
-    labels: List[str] = Field(default_factory=list)
-    has_attachments: bool = False
-
-
-class EmailContent(BaseModel):
-    """Model for email content."""
-    
-    plain_text: str
-    html: Optional[str] = None
 
 
 class EmailContextItem(ContextItem):
