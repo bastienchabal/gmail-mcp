@@ -22,8 +22,8 @@ from gmail_mcp.auth.oauth import get_credentials
 from gmail_mcp.mcp.schemas import (
     EmailMetadata, 
     EmailContent, 
-    Thread, 
-    Sender
+    ThreadInfo as Thread, 
+    SenderInfo as Sender
 )
 
 # Get logger
@@ -32,121 +32,181 @@ logger = get_logger(__name__)
 
 def parse_email_message(message: Dict[str, Any]) -> Tuple[EmailMetadata, EmailContent]:
     """
-    Parse a Gmail API message into structured email metadata and content.
+    Parse an email message from the Gmail API.
     
     Args:
         message (Dict[str, Any]): The Gmail API message object.
         
     Returns:
-        Tuple[EmailMetadata, EmailContent]: A tuple containing the email metadata and content.
+        Tuple[EmailMetadata, EmailContent]: The parsed email metadata and content.
     """
     # Extract headers
     headers = {}
     for header in message["payload"]["headers"]:
         headers[header["name"].lower()] = header["value"]
     
+    # Extract basic metadata
+    subject = headers.get("subject", "No Subject")
+    
     # Parse from field
-    from_email, from_name = parseaddr(headers.get("from", ""))
+    from_field = headers.get("from", "")
+    from_name, from_email = parseaddr(from_field)
+    
+    # Decode from_name if needed
+    if from_name:
+        try:
+            decoded_parts = []
+            for part, encoding in decode_header(from_name):
+                if isinstance(part, bytes):
+                    decoded_parts.append(part.decode(encoding or "utf-8", errors="replace"))
+                else:
+                    decoded_parts.append(part)
+            from_name = "".join(decoded_parts)
+        except Exception as e:
+            logger.warning(f"Failed to decode from_name: {e}")
     
     # Parse to field
+    to_field = headers.get("to", "")
     to_list = []
-    if "to" in headers:
-        for addr in headers["to"].split(","):
-            email_addr, _ = parseaddr(addr.strip())
+    if to_field:
+        for addr in to_field.split(","):
+            _, email_addr = parseaddr(addr.strip())
             if email_addr:
                 to_list.append(email_addr)
     
     # Parse cc field
+    cc_field = headers.get("cc", "")
     cc_list = []
-    if "cc" in headers:
-        for addr in headers["cc"].split(","):
-            email_addr, _ = parseaddr(addr.strip())
+    if cc_field:
+        for addr in cc_field.split(","):
+            _, email_addr = parseaddr(addr.strip())
             if email_addr:
                 cc_list.append(email_addr)
     
     # Parse date
-    date = None
-    if "date" in headers:
+    date_str = headers.get("date", "")
+    date = datetime.now()  # Default to now if parsing fails
+    if date_str:
         try:
-            date = parsedate_to_datetime(headers["date"])
+            date = parsedate_to_datetime(date_str)
         except Exception as e:
             logger.warning(f"Failed to parse date: {e}")
-            date = datetime.now()
-    else:
-        date = datetime.now()
     
     # Check for attachments
     has_attachments = False
     if "parts" in message["payload"]:
         for part in message["payload"]["parts"]:
-            if part.get("filename") and part["filename"].strip():
+            if part.get("filename"):
                 has_attachments = True
                 break
     
-    # Create metadata
+    # Create metadata object
     metadata = EmailMetadata(
         id=message["id"],
         thread_id=message["threadId"],
-        subject=headers.get("subject", "No Subject"),
+        subject=subject,
         from_email=from_email,
-        from_name=from_name if from_name else None,
+        from_name=from_name if from_name else "",
         to=to_list,
-        cc=cc_list if cc_list else None,
-        bcc=None,  # Gmail API doesn't provide BCC information
+        cc=cc_list if cc_list else [],
         date=date,
         labels=message.get("labelIds", []),
         has_attachments=has_attachments
     )
     
     # Extract content
-    plain_text = ""
-    html = None
-    
-    def extract_body(part):
-        """Extract body from message part."""
-        if part.get("mimeType") == "text/plain" and "data" in part.get("body", {}):
-            return base64.urlsafe_b64decode(part["body"]["data"].encode("ASCII")).decode("utf-8")
-        elif part.get("mimeType") == "text/html" and "data" in part.get("body", {}):
-            return base64.urlsafe_b64decode(part["body"]["data"].encode("ASCII")).decode("utf-8")
-        return None
-    
-    if "parts" in message["payload"]:
-        for part in message["payload"]["parts"]:
-            if part.get("mimeType") == "text/plain":
-                plain_text = extract_body(part) or ""
-            elif part.get("mimeType") == "text/html":
-                html = extract_body(part)
-            
-            # Handle nested multipart messages
-            if part.get("mimeType", "").startswith("multipart/") and "parts" in part:
-                for subpart in part["parts"]:
-                    if subpart.get("mimeType") == "text/plain" and not plain_text:
-                        plain_text = extract_body(subpart) or ""
-                    elif subpart.get("mimeType") == "text/html" and not html:
-                        html = extract_body(subpart)
-    elif "body" in message["payload"] and "data" in message["payload"]["body"]:
-        body_data = message["payload"]["body"]["data"]
-        decoded_data = base64.urlsafe_b64decode(body_data.encode("ASCII")).decode("utf-8")
-        
-        if message["payload"].get("mimeType") == "text/plain":
-            plain_text = decoded_data
-        elif message["payload"].get("mimeType") == "text/html":
-            html = decoded_data
-            # Extract plain text from HTML if no plain text part
-            plain_text = extract_text_from_html(decoded_data)
-    
-    # Create content
-    content = EmailContent(
-        plain_text=plain_text,
-        html=html
-    )
+    content = extract_content(message["payload"])
     
     return metadata, content
 
 
+def extract_content(payload: Dict[str, Any]) -> EmailContent:
+    """
+    Extract content from an email payload.
+    
+    Args:
+        payload (Dict[str, Any]): The email payload.
+        
+    Returns:
+        EmailContent: The extracted email content.
+    """
+    plain_text = ""
+    html = None
+    attachments = []
+    
+    def extract_body(part):
+        """
+        Extract body from a message part.
+        
+        Args:
+            part (Dict[str, Any]): The message part.
+            
+        Returns:
+            Tuple[str, str]: The plain text and HTML content.
+        """
+        nonlocal plain_text, html, attachments
+        
+        # Check if this part has a filename (attachment)
+        if part.get("filename"):
+            attachments.append({
+                "filename": part["filename"],
+                "mimeType": part["mimeType"],
+                "size": len(part.get("body", {}).get("data", "")),
+                "part_id": part.get("partId")
+            })
+            return
+        
+        # Check if this part has subparts
+        if "parts" in part:
+            for subpart in part["parts"]:
+                extract_body(subpart)
+            return
+        
+        # Extract body data
+        body_data = part.get("body", {}).get("data", "")
+        if not body_data:
+            return
+        
+        # Decode body data
+        try:
+            decoded_data = base64.urlsafe_b64decode(body_data).decode("utf-8")
+        except Exception as e:
+            logger.warning(f"Failed to decode body data: {e}")
+            return
+        
+        # Store based on mime type
+        mime_type = part.get("mimeType", "")
+        if mime_type == "text/plain":
+            plain_text = decoded_data
+        elif mime_type == "text/html":
+            html = decoded_data
+            # If we have HTML but no plain text, extract text from HTML
+            if not plain_text:
+                plain_text = extract_text_from_html(decoded_data)
+    
+    # Start extraction
+    extract_body(payload)
+    
+    # If we still don't have plain text but have a body, try to decode it
+    if not plain_text and "body" in payload and "data" in payload["body"]:
+        try:
+            plain_text = base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8")
+        except Exception as e:
+            logger.warning(f"Failed to decode body data: {e}")
+    
+    # Create content object
+    content = EmailContent(
+        plain_text=plain_text,
+        html=html,
+        attachments=attachments
+    )
+    
+    return content
+
+
 def extract_text_from_html(html_content: str) -> str:
     """
-    Extract plain text from HTML content by removing HTML tags.
+    Extract plain text from HTML content.
     
     Args:
         html_content (str): The HTML content.
@@ -154,30 +214,33 @@ def extract_text_from_html(html_content: str) -> str:
     Returns:
         str: The extracted plain text.
     """
-    # Simple regex to remove HTML tags
+    # Simple regex-based extraction
+    # Remove HTML tags
     text = re.sub(r'<[^>]+>', ' ', html_content)
+    
     # Replace multiple spaces with a single space
     text = re.sub(r'\s+', ' ', text)
+    
     # Replace HTML entities
-    text = text.replace('&nbsp;', ' ')
-    text = text.replace('&lt;', '<')
-    text = text.replace('&gt;', '>')
-    text = text.replace('&amp;', '&')
-    text = text.replace('&quot;', '"')
-    text = text.replace('&apos;', "'")
+    text = re.sub(r'&nbsp;', ' ', text)
+    text = re.sub(r'&lt;', '<', text)
+    text = re.sub(r'&gt;', '>', text)
+    text = re.sub(r'&amp;', '&', text)
+    text = re.sub(r'&quot;', '"', text)
+    text = re.sub(r'&#39;', "'", text)
     
     return text.strip()
 
 
 def analyze_thread(thread_id: str) -> Optional[Thread]:
     """
-    Analyze an email thread to extract thread information.
+    Analyze a thread to extract information.
     
     Args:
         thread_id (str): The ID of the thread to analyze.
         
     Returns:
-        Optional[Thread]: The thread information, or None if an error occurred.
+        Optional[Thread]: The thread information, or None if the thread could not be analyzed.
     """
     credentials = get_credentials()
     
@@ -192,46 +255,57 @@ def analyze_thread(thread_id: str) -> Optional[Thread]:
         # Get the thread
         thread = service.users().threads().get(userId="me", id=thread_id).execute()
         
-        # Extract messages
+        # Extract basic information
         messages = thread.get("messages", [])
-        message_ids = [msg["id"] for msg in messages]
+        
+        if not messages:
+            logger.warning(f"Thread {thread_id} has no messages")
+            return None
+        
+        # Extract subject from the first message
+        subject = "No Subject"
+        for header in messages[0]["payload"]["headers"]:
+            if header["name"].lower() == "subject":
+                subject = header["value"]
+                break
         
         # Extract participants
         participants = set()
+        message_ids = []
+        last_message_date = None
+        
         for message in messages:
-            metadata, _ = parse_email_message(message)
-            participants.add(metadata.from_email)
-            participants.update(metadata.to or [])
-            if metadata.cc:
-                participants.update(metadata.cc)
-        
-        # Get subject from the first message
-        subject = ""
-        if messages:
-            for header in messages[0]["payload"]["headers"]:
-                if header["name"].lower() == "subject":
-                    subject = header["value"]
-                    break
-        
-        # Get last message date
-        last_message_date = datetime.now()
-        if messages:
-            last_message = messages[-1]
-            for header in last_message["payload"]["headers"]:
-                if header["name"].lower() == "date":
-                    try:
-                        last_message_date = parsedate_to_datetime(header["value"])
-                    except Exception as e:
-                        logger.warning(f"Failed to parse date: {e}")
-                    break
+            message_ids.append(message["id"])
+            
+            # Extract headers
+            headers = {}
+            for header in message["payload"]["headers"]:
+                headers[header["name"].lower()] = header["value"]
+            
+            # Extract participants from from, to, and cc fields
+            for field in ["from", "to", "cc"]:
+                if field in headers:
+                    for addr in headers[field].split(","):
+                        name, email_addr = parseaddr(addr.strip())
+                        if email_addr:
+                            participants.add(email_addr)
+            
+            # Extract date
+            date_str = headers.get("date", "")
+            if date_str:
+                try:
+                    date = parsedate_to_datetime(date_str)
+                    if not last_message_date or date > last_message_date:
+                        last_message_date = date
+                except Exception as e:
+                    logger.warning(f"Failed to parse date: {e}")
         
         # Create thread object
         thread_obj = Thread(
             id=thread_id,
             subject=subject,
-            messages=message_ids,
-            participants=list(participants),
-            last_message_date=last_message_date,
+            participants=[{"email": p} for p in participants],
+            last_message_date=last_message_date or datetime.now(),
             message_count=len(messages)
         )
         
@@ -244,13 +318,13 @@ def analyze_thread(thread_id: str) -> Optional[Thread]:
 
 def get_sender_history(sender_email: str) -> Optional[Sender]:
     """
-    Get the history of emails from a specific sender.
+    Get the history of a sender.
     
     Args:
         sender_email (str): The email address of the sender.
         
     Returns:
-        Optional[Sender]: The sender information, or None if an error occurred.
+        Optional[Sender]: The sender information, or None if the sender could not be analyzed.
     """
     credentials = get_credentials()
     
@@ -272,37 +346,45 @@ def get_sender_history(sender_email: str) -> Optional[Sender]:
             # No messages found
             return Sender(
                 email=sender_email,
+                name="",
                 message_count=0
             )
         
-        # Get the first and last message dates
-        first_message = service.users().messages().get(userId="me", id=messages[-1]["id"]).execute()
-        last_message = service.users().messages().get(userId="me", id=messages[0]["id"]).execute()
+        # Extract metadata from messages
+        message_metadata = []
+        sender_name = ""
         
-        first_metadata, _ = parse_email_message(first_message)
-        last_metadata, _ = parse_email_message(last_message)
-        
-        # Extract sender name from the last message
-        sender_name = last_metadata.from_name
-        
-        # Analyze common topics
-        topics = []
-        subject_words = {}
-        
-        # Process up to 20 messages to find common topics
-        for i, message_info in enumerate(messages[:20]):
+        for message_info in messages:
             message = service.users().messages().get(userId="me", id=message_info["id"]).execute()
-            metadata, _ = parse_email_message(message)
+            metadata = extract_email_metadata(message)
+            message_metadata.append(metadata)
             
-            # Extract words from subject
-            if metadata.subject:
-                words = re.findall(r'\b\w+\b', metadata.subject.lower())
-                for word in words:
-                    if len(word) > 3:  # Ignore short words
-                        subject_words[word] = subject_words.get(word, 0) + 1
+            # Get sender name from the first message
+            if not sender_name and metadata.from_name:
+                sender_name = metadata.from_name
         
-        # Find common topics (words that appear in multiple subjects)
-        for word, count in sorted(subject_words.items(), key=lambda x: x[1], reverse=True):
+        # Sort by date
+        message_metadata.sort(key=lambda x: x.date)
+        
+        # Get first and last message dates
+        first_metadata = message_metadata[0]
+        last_metadata = message_metadata[-1]
+        
+        # Extract common topics
+        # This is a simple implementation that just counts words in subjects
+        word_counts = {}
+        for metadata in message_metadata:
+            # Split subject into words
+            words = re.findall(r'\b\w+\b', metadata.subject.lower())
+            for word in words:
+                # Skip common words
+                if word in ["re", "fw", "fwd", "the", "and", "or", "to", "from", "for", "in", "on", "at", "with", "by"]:
+                    continue
+                word_counts[word] = word_counts.get(word, 0) + 1
+        
+        # Get top topics
+        topics = []
+        for word, count in sorted(word_counts.items(), key=lambda x: x[1], reverse=True):
             if count >= 2 and len(topics) < 5:  # At least 2 occurrences, max 5 topics
                 topics.append(word)
         

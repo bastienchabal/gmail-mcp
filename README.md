@@ -33,6 +33,7 @@ Before using the MCP server, you need to authenticate with Google:
 
 ```bash
 python debug/simple_auth.py
+python -c "from gmail_mcp.auth.oauth import start_oauth_process; print(start_oauth_process(timeout=60))"
 ```
 
 This will:

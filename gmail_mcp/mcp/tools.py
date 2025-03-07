@@ -1,31 +1,164 @@
 """
-Gmail Client Module
+MCP Tools Module
 
-This module provides tools for interacting with the Gmail API.
+This module defines all the tools available in the Gmail MCP server.
+Tools are functions that Claude can call to perform actions.
 """
 
 import logging
 from typing import Dict, Any, List, Optional
+import httpx
 
-from mcp.server.fastmcp import FastMCP, Context
+from mcp.server.fastmcp import FastMCP
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
+from google.auth.transport.requests import Request as GoogleRequest
 
 from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.config import get_config
-from gmail_mcp.auth.oauth import get_credentials
+from gmail_mcp.auth.token_manager import TokenManager
+from gmail_mcp.auth.oauth import get_credentials, login, process_auth_code, start_oauth_process
 
 # Get logger
 logger = get_logger(__name__)
 
+# Get token manager
+token_manager = TokenManager()
 
-def setup_gmail_tools(mcp: FastMCP) -> None:
+
+def setup_tools(mcp: FastMCP) -> None:
     """
-    Set up Gmail tools on the FastMCP application.
+    Set up all MCP tools on the FastMCP application.
     
     Args:
         mcp (FastMCP): The FastMCP application.
     """
+    # Authentication tools
+    @mcp.tool()
+    def login_tool() -> str:
+        """
+        Initiate the OAuth2 flow by providing a link to the Google authorization page.
+        
+        Returns:
+            str: The authorization URL to redirect to.
+        """
+        return login()
+    
+    @mcp.tool()
+    def authenticate() -> str:
+        """
+        Start the complete OAuth authentication process.
+        
+        This tool opens a browser window and starts a local server to handle the callback.
+        
+        Returns:
+            str: A message indicating that the authentication process has started.
+        """
+        # Start the OAuth process in a separate thread
+        import threading
+        thread = threading.Thread(target=start_oauth_process)
+        thread.daemon = True
+        thread.start()
+        
+        return "Authentication process started. Please check your browser to complete the process."
+    
+    @mcp.tool()
+    def process_auth_code_tool(code: str, state: str) -> str:
+        """
+        Process the OAuth2 authorization code and state.
+        
+        Args:
+            code (str): The authorization code from Google.
+            state (str): The state parameter from Google.
+            
+        Returns:
+            str: A success or error message.
+        """
+        return process_auth_code(code, state)
+    
+    @mcp.tool()
+    def logout() -> str:
+        """
+        Log out by revoking the access token and clearing the stored credentials.
+        
+        Returns:
+            str: A success or error message.
+        """
+        # Get the credentials
+        credentials = token_manager.get_token()
+        
+        if credentials:
+            try:
+                # Revoke the access token
+                httpx.post(
+                    "https://oauth2.googleapis.com/revoke",
+                    params={"token": credentials.token},
+                    headers={"content-type": "application/x-www-form-urlencoded"},
+                )
+                
+                # Clear the stored credentials
+                token_manager.clear_token()
+                
+                return "Logged out successfully."
+            except Exception as e:
+                logger.error(f"Failed to revoke token: {e}")
+                return f"Error: Failed to revoke token: {e}"
+        else:
+            return "No active session to log out from."
+    
+    @mcp.tool()
+    def check_auth_status() -> Dict[str, Any]:
+        """
+        Check the current authentication status.
+        
+        This tool provides a direct way to check if the user is authenticated
+        without having to access the auth://status resource.
+        
+        Returns:
+            Dict[str, Any]: The authentication status.
+        """
+        # Get the credentials
+        credentials = token_manager.get_token()
+        
+        if not credentials:
+            return {
+                "authenticated": False,
+                "message": "Not authenticated. Use the authenticate tool to start the authentication process.",
+                "next_steps": [
+                    "Call authenticate() to start the authentication process"
+                ]
+            }
+        
+        # Check if the credentials are expired
+        if credentials.expired:
+            try:
+                # Try to refresh the token
+                credentials.refresh(GoogleRequest())
+                token_manager.store_token(credentials)
+                
+                return {
+                    "authenticated": True,
+                    "message": "Authentication is valid. Token was refreshed.",
+                    "status": "refreshed"
+                }
+            except Exception as e:
+                logger.error(f"Failed to refresh token: {e}")
+                return {
+                    "authenticated": False,
+                    "message": f"Authentication expired and could not be refreshed: {e}",
+                    "next_steps": [
+                        "Call authenticate() to start a new authentication process"
+                    ],
+                    "status": "expired"
+                }
+        
+        return {
+            "authenticated": True,
+            "message": "Authentication is valid.",
+            "status": "valid"
+        }
+    
+    # Gmail tools
     @mcp.tool()
     def get_email_count() -> Dict[str, Any]:
         """
@@ -53,7 +186,7 @@ def setup_gmail_tools(mcp: FastMCP) -> None:
         credentials = get_credentials()
         
         if not credentials:
-            return {"error": "Not authenticated. Please use the login tool first."}
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
         
         try:
             # Build the Gmail API service
@@ -105,7 +238,7 @@ def setup_gmail_tools(mcp: FastMCP) -> None:
         credentials = get_credentials()
         
         if not credentials:
-            return {"error": "Not authenticated. Please use the login tool first."}
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
         
         try:
             # Build the Gmail API service
@@ -186,7 +319,7 @@ def setup_gmail_tools(mcp: FastMCP) -> None:
         credentials = get_credentials()
         
         if not credentials:
-            return {"error": "Not authenticated. Please use the login tool first."}
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
         
         try:
             # Build the Gmail API service
@@ -268,7 +401,7 @@ def setup_gmail_tools(mcp: FastMCP) -> None:
         credentials = get_credentials()
         
         if not credentials:
-            return {"error": "Not authenticated. Please use the login tool first."}
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
         
         try:
             # Build the Gmail API service
@@ -311,89 +444,6 @@ def setup_gmail_tools(mcp: FastMCP) -> None:
         except HttpError as error:
             logger.error(f"Failed to search emails: {error}")
             return {"error": f"Failed to search emails: {error}"}
-    
-    @mcp.resource("gmail://status")
-    def gmail_status() -> Dict[str, Any]:
-        """
-        Get the current status of the Gmail account.
-        
-        This resource provides information about the user's Gmail account,
-        including authentication status, email address, and account statistics.
-        
-        Returns:
-            Dict[str, Any]: The Gmail account status.
-        """
-        credentials = get_credentials()
-        
-        if not credentials:
-            return {
-                "authenticated": False,
-                "message": "Not authenticated. Use the authenticate tool to start the authentication process.",
-                "next_steps": [
-                    "Check auth://status for authentication details",
-                    "Call authenticate() to start the authentication process"
-                ]
-            }
-        
-        try:
-            # Build the Gmail API service
-            service = build("gmail", "v1", credentials=credentials)
-            
-            # Get the profile information
-            profile = service.users().getProfile(userId="me").execute()
-            
-            # Get labels to calculate counts
-            labels = service.users().labels().list(userId="me").execute()
-            
-            # Extract label information
-            label_info = {}
-            for label in labels.get("labels", []):
-                try:
-                    label_details = service.users().labels().get(userId="me", id=label["id"]).execute()
-                    label_info[label["name"]] = {
-                        "total": label_details.get("messagesTotal", 0),
-                        "unread": label_details.get("messagesUnread", 0)
-                    }
-                except Exception as e:
-                    logger.error(f"Failed to get label details for {label['name']}: {e}")
-            
-            # Get the authentication status
-            import httpx
-            response = httpx.get(
-                "https://www.googleapis.com/oauth2/v1/userinfo",
-                headers={"Authorization": f"Bearer {credentials.token}"},
-            )
-            user_info = response.json()
-            
-            return {
-                "authenticated": True,
-                "email": profile.get("emailAddress", user_info.get("email", "Unknown")),
-                "name": user_info.get("name", "Unknown"),
-                "picture": user_info.get("picture"),
-                "account_stats": {
-                    "total_messages": profile.get("messagesTotal", 0),
-                    "total_threads": profile.get("threadsTotal", 0),
-                    "storage_used": profile.get("storageUsed", 0),
-                    "storage_used_percent": round(int(profile.get("storageUsed", 0)) / (15 * 1024 * 1024 * 1024) * 100, 2)  # Assuming 15GB limit
-                },
-                "labels": label_info,
-                "expires_at": credentials.expiry.isoformat() if credentials.expiry else None,
-                "message": "Gmail account is accessible.",
-                "status": "active"
-            }
-        except Exception as e:
-            logger.error(f"Failed to get Gmail status: {e}")
-            return {
-                "authenticated": True,
-                "error": f"Failed to get Gmail status: {e}",
-                "message": "Authentication is valid, but failed to get Gmail account information.",
-                "next_steps": [
-                    "Try again later",
-                    "Check if the Gmail API is enabled in the Google Cloud Console",
-                    "Check if the user has granted the necessary permissions"
-                ],
-                "status": "error"
-            }
     
     @mcp.tool()
     def get_email_overview() -> Dict[str, Any]:

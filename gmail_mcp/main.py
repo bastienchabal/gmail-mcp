@@ -1,35 +1,31 @@
 #!/usr/bin/env python3
 """
-Gmail MCP Server - Main Entry Point
+Gmail MCP Server
 
-This module serves as the entry point for the Gmail MCP server application.
-It initializes the FastMCP application and sets up the MCP tools and resources.
+This module provides the main entry point for the Gmail MCP server.
 """
 
 import os
 import logging
 import sys
 import traceback
-from typing import Dict, Any
+from typing import Dict, Any, List, Optional
 
 from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
+from gmail_mcp.utils.logger import get_logger
 from gmail_mcp.utils.config import get_config
-from gmail_mcp.utils.logger import setup_logger
-from gmail_mcp.auth.oauth import setup_oauth_routes, start_oauth_process
 from gmail_mcp.auth.token_manager import TokenManager
-from gmail_mcp.gmail.client import setup_gmail_tools
-from gmail_mcp.gmail.processor import parse_email_message, analyze_thread, get_sender_history, extract_email_metadata
-from gmail_mcp.context.builders import setup_resource_builders
-from gmail_mcp.mcp.server import setup_mcp_handlers
+from gmail_mcp.mcp.tools import setup_tools
+from gmail_mcp.mcp.resources import setup_resources
 from gmail_mcp.mcp.prompts import setup_prompts
 
 # Load environment variables
 load_dotenv()
 
-# Setup logging
-logger = setup_logger()
+# Get logger
+logger = get_logger(__name__)
 
 # Get configuration
 config = get_config()
@@ -42,29 +38,13 @@ mcp = FastMCP(
         "A Model Context Protocol server for Gmail integration with Claude Desktop",
     ),
     version="1.3.0",
-    default_prompt="gmail_welcome",
+    default_prompt="gmail://quickstart",
 )
 
-# Setup OAuth routes
-setup_oauth_routes(mcp)
-
-# Setup Gmail tools
-setup_gmail_tools(mcp)
-
-# Setup resource builders
-setup_resource_builders(mcp)
-
-# Setup additional MCP handlers
-setup_mcp_handlers(mcp)
-
-# Setup prompts
+# Setup tools, resources, and prompts
+setup_tools(mcp)
+setup_resources(mcp)
 setup_prompts(mcp)
-
-# Health check resource
-@mcp.resource("health://")
-def health_check() -> Dict[str, Any]:
-    """Health check endpoint."""
-    return {"status": "healthy", "version": "0.1.0"}
 
 def check_authentication(max_attempts: int = 3, timeout: int = 300) -> bool:
     """
@@ -90,80 +70,50 @@ def check_authentication(max_attempts: int = 3, timeout: int = 300) -> bool:
                 logger.info("Credentials are valid")
                 return True
             else:
-                logger.warning("Tokens exist but credentials are invalid, need to re-authenticate")
-                # Delete the invalid tokens
+                logger.warning("Credentials are invalid, deleting tokens and starting authentication")
                 token_manager.clear_token()
         except Exception as e:
             logger.error(f"Error checking credentials: {e}")
-            logger.error(traceback.format_exc())
-            # Delete the invalid tokens
+            logger.warning("Deleting tokens and starting authentication")
             token_manager.clear_token()
     
-    # Try to authenticate
-    for attempt in range(1, max_attempts + 1):
-        logger.warning("No authentication tokens found. User needs to authenticate.")
-        print("\n" + "=" * 80)
-        print("AUTHENTICATION REQUIRED")
-        print("=" * 80)
-        print(f"Starting the authentication process (attempt {attempt}/{max_attempts})...")
-        print("A browser window will open to complete the authentication.")
-        print("=" * 80 + "\n")
-        
-        # Start the OAuth process with the specified timeout
-        success = start_oauth_process(timeout=timeout)
-        
-        if success:
-            logger.info("Authentication successful")
-            return True
-        
-        # If we've reached the maximum number of attempts, give up
-        if attempt >= max_attempts:
-            logger.error(f"Authentication failed after {max_attempts} attempts")
-            print("\n" + "=" * 80)
-            print("AUTHENTICATION FAILED")
-            print("=" * 80)
-            print(f"Failed to authenticate after {max_attempts} attempts.")
-            print("Please check your Google Cloud Console configuration and try again later.")
-            print("=" * 80 + "\n")
-            return False
-        
-        # Otherwise, try again
-        print("\n" + "=" * 80)
-        print("AUTHENTICATION FAILED - RETRYING")
-        print("=" * 80)
-        print(f"Authentication attempt {attempt}/{max_attempts} failed.")
-        print(f"Retrying in 3 seconds...")
-        print("=" * 80 + "\n")
-        
-        # Wait a bit before trying again
-        import time
-        time.sleep(3)
+    # No tokens or invalid tokens, start authentication
+    logger.info("No authentication tokens found, starting authentication")
     
-    # We should never get here, but just in case
+    # Start authentication process
+    from gmail_mcp.auth.oauth import start_oauth_process
+    for attempt in range(max_attempts):
+        logger.info(f"Authentication attempt {attempt + 1}/{max_attempts}")
+        try:
+            if start_oauth_process(timeout=timeout):
+                logger.info("Authentication successful")
+                return True
+        except Exception as e:
+            logger.error(f"Authentication failed: {e}")
+            logger.error(traceback.format_exc())
+    
+    logger.error(f"Authentication failed after {max_attempts} attempts")
     return False
 
+
 def main() -> None:
-    """Run the application."""
-    logger.info("Starting Gmail MCP server")
-    logger.info(f"Server configuration: host={config['host']}, port={config['port']}")
-    
+    """
+    Main entry point for the Gmail MCP server.
+    """
     try:
-        # Check if the user is authenticated
+        # Check authentication
         if not check_authentication():
             logger.error("Authentication failed, exiting")
-            print("Exiting due to authentication failure.")
             sys.exit(1)
         
-        # Run the server
-        # The run method doesn't accept host, port, reload, or log_level parameters
-        # Instead, we should use the mcp CLI tool to run the server
+        # Run the MCP server
+        logger.info("Starting MCP server")
         mcp.run()
     except Exception as e:
-        logger.error(f"Error running the application: {e}")
+        logger.error(f"Error running MCP server: {e}")
         logger.error(traceback.format_exc())
-        print(f"Error running the application: {e}")
-        print("Please check the logs for more information.")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main() 
