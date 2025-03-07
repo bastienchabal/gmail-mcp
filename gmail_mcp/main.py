@@ -17,6 +17,8 @@ from gmail_mcp.utils.config import get_config
 from gmail_mcp.utils.logger import setup_logger
 from gmail_mcp.auth.oauth import setup_oauth_routes
 from gmail_mcp.gmail.client import setup_gmail_tools
+from gmail_mcp.gmail.processor import parse_email_message, analyze_thread, get_sender_history, extract_email_metadata
+from gmail_mcp.context.builders import setup_context_builders
 from gmail_mcp.mcp.server import setup_mcp_handlers
 
 # Load environment variables
@@ -43,6 +45,9 @@ setup_oauth_routes(mcp)
 
 # Setup Gmail tools
 setup_gmail_tools(mcp)
+
+# Setup context builders
+setup_context_builders(mcp)
 
 # Setup additional MCP handlers
 setup_mcp_handlers(mcp)
