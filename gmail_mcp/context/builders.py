@@ -1,8 +1,9 @@
 """
-Context Builders Module
+Resource Builders Module
 
-This module provides context builders for the Gmail MCP server.
-These builders create rich context objects for Claude to use when processing requests.
+This module provides resource builders for the Gmail MCP server.
+These builders create rich resources that Claude can use as context when processing requests.
+Resources are exposed through the MCP protocol and can be accessed by the client application.
 """
 
 from typing import Dict, Any, List, Optional
@@ -28,36 +29,31 @@ from gmail_mcp.mcp.schemas import (
 logger = get_logger(__name__)
 
 
-def setup_context_builders(mcp: FastMCP) -> None:
+def setup_resource_builders(mcp: FastMCP) -> None:
     """
-    Set up context builders on the FastMCP application.
+    Set up resource builders on the FastMCP application.
     
     Args:
         mcp (FastMCP): The FastMCP application.
     """
-    @mcp.context_builder()
-    def build_email_context(context: Context) -> List[Dict[str, Any]]:
+    @mcp.resource("email://{email_id}")
+    def build_email_context(email_id: str) -> Dict[str, Any]:
         """
         Build context for email-related requests.
         
-        This context builder extracts information about the current email being viewed
-        and adds it to the context for Claude to use.
+        This resource extracts information about the specified email
+        and provides it as context for Claude to use.
         
         Args:
-            context (Context): The current context.
+            email_id (str): The ID of the email to get context for.
             
         Returns:
-            List[Dict[str, Any]]: The context items to add.
+            Dict[str, Any]: The email context.
         """
-        # Check if we have an email ID in the context
-        email_id = context.get("email_id")
-        if not email_id:
-            return []
-        
         credentials = get_credentials()
         if not credentials:
             logger.error("Not authenticated")
-            return []
+            return {"error": "Not authenticated"}
         
         try:
             from googleapiclient.discovery import build
@@ -91,60 +87,30 @@ def setup_context_builders(mcp: FastMCP) -> None:
                 }
             )
             
-            return [email_context.dict()]
+            return email_context.dict()
         
         except Exception as e:
             logger.error(f"Failed to build email context: {e}")
-            return []
+            return {"error": f"Failed to build email context: {e}"}
     
-    @mcp.context_builder()
-    def build_thread_context(context: Context) -> List[Dict[str, Any]]:
+    @mcp.resource("thread://{thread_id}")
+    def build_thread_context(thread_id: str) -> Dict[str, Any]:
         """
         Build context for thread-related requests.
         
-        This context builder extracts information about the current thread being viewed
-        and adds it to the context for Claude to use.
+        This resource extracts information about the specified thread
+        and provides it as context for Claude to use.
         
         Args:
-            context (Context): The current context.
+            thread_id (str): The ID of the thread to get context for.
             
         Returns:
-            List[Dict[str, Any]]: The context items to add.
+            Dict[str, Any]: The thread context.
         """
-        # Check if we have a thread ID in the context
-        thread_id = context.get("thread_id")
-        if not thread_id:
-            # Try to get thread ID from email ID
-            email_id = context.get("email_id")
-            if not email_id:
-                return []
-            
-            credentials = get_credentials()
-            if not credentials:
-                logger.error("Not authenticated")
-                return []
-            
-            try:
-                from googleapiclient.discovery import build
-                
-                # Build the Gmail API service
-                service = build("gmail", "v1", credentials=credentials)
-                
-                # Get the message to extract thread ID
-                message = service.users().messages().get(userId="me", id=email_id, fields="threadId").execute()
-                thread_id = message.get("threadId")
-                
-                if not thread_id:
-                    return []
-            
-            except Exception as e:
-                logger.error(f"Failed to get thread ID from email: {e}")
-                return []
-        
         # Analyze the thread
         thread = analyze_thread(thread_id)
         if not thread:
-            return []
+            return {"error": "Thread not found or could not be analyzed"}
         
         # Create context item
         thread_context = ThreadContextItem(
@@ -158,78 +124,38 @@ def setup_context_builders(mcp: FastMCP) -> None:
             }
         )
         
-        return [thread_context.dict()]
+        return thread_context.dict()
     
-    @mcp.context_builder()
-    def build_sender_context(context: Context) -> List[Dict[str, Any]]:
+    @mcp.resource("sender://{sender_email}")
+    def build_sender_context(sender_email: str) -> Dict[str, Any]:
         """
         Build context for sender-related requests.
         
-        This context builder extracts information about the sender of the current email
-        and adds it to the context for Claude to use.
+        This resource extracts information about the specified sender
+        and provides it as context for Claude to use.
         
         Args:
-            context (Context): The current context.
+            sender_email (str): The email address of the sender to get context for.
             
         Returns:
-            List[Dict[str, Any]]: The context items to add.
+            Dict[str, Any]: The sender context.
         """
-        # Check if we have an email ID in the context
-        email_id = context.get("email_id")
-        if not email_id:
-            return []
+        # Get sender history
+        sender = get_sender_history(sender_email)
+        if not sender:
+            return {"error": "Sender not found or could not be analyzed"}
         
-        credentials = get_credentials()
-        if not credentials:
-            logger.error("Not authenticated")
-            return []
+        # Create context item
+        sender_context = SenderContextItem(
+            type="sender",
+            content={
+                "email": sender.email,
+                "name": sender.name,
+                "message_count": sender.message_count,
+                "first_message_date": sender.first_message_date.isoformat() if sender.first_message_date else None,
+                "last_message_date": sender.last_message_date.isoformat() if sender.last_message_date else None,
+                "common_topics": sender.common_topics
+            }
+        )
         
-        try:
-            from googleapiclient.discovery import build
-            
-            # Build the Gmail API service
-            service = build("gmail", "v1", credentials=credentials)
-            
-            # Get the message
-            message = service.users().messages().get(userId="me", id=email_id, fields="payload").execute()
-            
-            # Extract sender email
-            sender_email = None
-            for header in message["payload"]["headers"]:
-                if header["name"].lower() == "from":
-                    # Extract email from "Name <email>" format
-                    from_value = header["value"]
-                    import re
-                    email_match = re.search(r'<([^>]+)>', from_value)
-                    if email_match:
-                        sender_email = email_match.group(1)
-                    else:
-                        sender_email = from_value
-                    break
-            
-            if not sender_email:
-                return []
-            
-            # Get sender history
-            sender = get_sender_history(sender_email)
-            if not sender:
-                return []
-            
-            # Create context item
-            sender_context = SenderContextItem(
-                type="sender",
-                content={
-                    "email": sender.email,
-                    "name": sender.name,
-                    "message_count": sender.message_count,
-                    "first_message_date": sender.first_message_date.isoformat() if sender.first_message_date else None,
-                    "last_message_date": sender.last_message_date.isoformat() if sender.last_message_date else None,
-                    "common_topics": sender.common_topics
-                }
-            )
-            
-            return [sender_context.dict()]
-        
-        except Exception as e:
-            logger.error(f"Failed to build sender context: {e}")
-            return [] 
+        return sender_context.dict() 

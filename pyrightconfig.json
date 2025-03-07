@@ -1,0 +1,21 @@
+{
+  "include": [
+    "gmail_mcp"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    ".venv"
+  ],
+  "ignore": [
+    "gmail_mcp/tests"
+  ],
+  "reportMissingImports": false,
+  "reportMissingTypeStubs": false,
+  "pythonVersion": "3.10",
+  "pythonPlatform": "Darwin",
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
+  "venvPath": ".",
+  "venv": ".venv"
+} 

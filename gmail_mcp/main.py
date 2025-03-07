@@ -18,7 +18,7 @@ from gmail_mcp.utils.logger import setup_logger
 from gmail_mcp.auth.oauth import setup_oauth_routes
 from gmail_mcp.gmail.client import setup_gmail_tools
 from gmail_mcp.gmail.processor import parse_email_message, analyze_thread, get_sender_history, extract_email_metadata
-from gmail_mcp.context.builders import setup_context_builders
+from gmail_mcp.context.builders import setup_resource_builders
 from gmail_mcp.mcp.server import setup_mcp_handlers
 
 # Load environment variables
@@ -46,8 +46,8 @@ setup_oauth_routes(mcp)
 # Setup Gmail tools
 setup_gmail_tools(mcp)
 
-# Setup context builders
-setup_context_builders(mcp)
+# Setup resource builders (formerly context builders)
+setup_resource_builders(mcp)
 
 # Setup additional MCP handlers
 setup_mcp_handlers(mcp)
@@ -64,12 +64,9 @@ def main() -> None:
     logger.info(f"Server configuration: host={config['host']}, port={config['port']}")
     
     # Run the server
-    mcp.run(
-        host=config["host"],
-        port=config["port"],
-        reload=config["debug"],
-        log_level=config["log_level"].lower(),
-    )
+    # The run method doesn't accept host, port, reload, or log_level parameters
+    # Instead, we should use the mcp CLI tool to run the server
+    mcp.run()
 
 if __name__ == "__main__":
     main() 
