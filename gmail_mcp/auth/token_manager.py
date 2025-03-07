@@ -8,7 +8,7 @@ import os
 import json
 import base64
 import logging
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional, List, Union, cast
 from pathlib import Path
 from datetime import datetime
 
@@ -30,7 +30,8 @@ class TokenManager:
     def __init__(self) -> None:
         """Initialize the TokenManager."""
         self.config = get_config()
-        self.token_path = Path(self.config["token_storage_path"])
+        # Use tokens.json in the root directory by default
+        self.token_path = Path(self.config.get("token_storage_path", "tokens.json"))
         self.encryption_key = self._get_encryption_key()
         self.fernet = Fernet(self.encryption_key) if self.encryption_key else None
         self._state = None
@@ -42,7 +43,7 @@ class TokenManager:
         Returns:
             Optional[bytes]: The encryption key, or None if not set.
         """
-        key = self.config["token_encryption_key"]
+        key = self.config.get("token_encryption_key", "")
         
         if not key:
             logger.warning("No encryption key found, tokens will not be encrypted")
@@ -57,12 +58,13 @@ class TokenManager:
         # Convert to bytes and encode for Fernet
         return base64.urlsafe_b64encode(key.encode())
     
-    def store_token(self, credentials: Credentials) -> None:
+    def store_token(self, credentials: Any) -> None:
         """
         Store the OAuth token securely.
         
         Args:
-            credentials (Credentials): The OAuth credentials to store.
+            credentials (Any): The OAuth credentials to store. This can be any type of credentials
+                               that has the required attributes.
         """
         # Create the token directory if it doesn't exist
         self.token_path.parent.mkdir(parents=True, exist_ok=True)
@@ -175,4 +177,13 @@ class TokenManager:
             return False
         
         logger.info("Verified OAuth state parameter")
-        return True 
+        return True
+        
+    def tokens_exist(self) -> bool:
+        """
+        Check if the token file exists.
+        
+        Returns:
+            bool: True if the token file exists, False otherwise.
+        """
+        return self.token_path.exists() 

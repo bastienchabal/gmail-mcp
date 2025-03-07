@@ -1,25 +1,18 @@
-# Gmail MCP Server
+# Gmail MCP Server for Claude
 
-A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop, enabling intelligent, context-aware interactions with your email.
+This project provides a Model Context Protocol (MCP) server that allows Claude Desktop to access your Gmail account. It enables Claude to read your emails, search for specific messages, and perform other Gmail-related tasks.
 
-## Features
+## Setup Instructions
 
-- **Deep Email Analysis**: Provides comprehensive context from entire conversation threads
-- **Context-Aware Responses**: Generates responses considering full communication history
-- **Intelligent Action Suggestions**: Analyzes email content for calendar events, tasks, and follow-ups
-- **Advanced Search**: Searches across entire email history with semantic understanding
-- **Personalization**: Adapts to your communication style with specific contacts
+### Prerequisites
 
-## Prerequisites
+- Python 3.8 or higher
+- Claude Desktop installed
+- A Google account with Gmail
 
-- Python 3.10+
-- A Google Cloud Platform account with Gmail API enabled
-- OAuth 2.0 credentials for the Gmail API
-- Claude Desktop with MCP support
+### Installation
 
-## Installation
-
-1. Clone the repository:
+1. Clone this repository:
    ```bash
    git clone https://github.com/yourusername/gmail-mcp.git
    cd gmail-mcp
@@ -32,79 +25,87 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-3. Install the package and its dependencies:
-   ```bash
-   uv pip install -e .
-   ```
-   This will install all dependencies defined in `pyproject.toml`.
-
-4. Create a `.env` file based on `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
-
-5. Configure your OAuth credentials in the `.env` file.
-
-## Configuration
-
-1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the Gmail API
-4. Create OAuth 2.0 credentials (Web application type)
-5. Add `http://localhost:8000/auth/callback` as an authorized redirect URI
-6. Copy the Client ID and Client Secret to your `.env` file
-
 ## Usage
 
-1. Start the MCP server:
-   ```bash
-   python -m gmail_mcp.main
-   ```
+### Step 1: Authenticate with Google
 
-2. The server will start on `http://localhost:8000`
-
-3. On first run, you'll be prompted to authorize the application with your Google account
-
-4. In Claude Desktop, connect to the MCP server using the URL `http://localhost:8000`
-
-## Development
-
-### Project Structure
-
-See [docs/structure.md](docs/structure.md) for the detailed project structure.
-
-### Implementation Plan
-
-The implementation plan and progress are tracked in [docs/todo.md](docs/todo.md).
-
-### Adding Dependencies
-
-To add new dependencies to the project, update the `dependencies` section in `pyproject.toml`:
-
-```toml
-dependencies = [
-    "mcp-python-sdk>=0.1.0",
-    "your-new-dependency>=1.0.0",
-]
-```
-
-Then reinstall the package:
-```bash
-uv pip install -e .
-```
-
-### Running Tests
+Before using the MCP server, you need to authenticate with Google:
 
 ```bash
-pytest
+python debug/simple_auth.py
 ```
+
+This will:
+1. Open the MCP inspector in your browser
+2. Guide you through the Google authentication process
+3. Generate a token file that allows the MCP server to access your Gmail account
+
+Follow the on-screen instructions to complete the authentication.
+
+### Step 2: Run the MCP Server
+
+Once you have authenticated, you can run the MCP server:
+
+```bash
+python run_gmail_mcp.py
+```
+
+This will:
+1. Start the Gmail MCP server
+2. Keep it running in the background
+3. Provide instructions for using it with Claude Desktop
+
+Keep this terminal window open while using Claude Desktop.
+
+### Step 3: Use Claude Desktop
+
+With the MCP server running:
+1. Open Claude Desktop
+2. Type a prompt like: "Please retrieve my last email"
+3. Claude should automatically connect to the MCP server and access your Gmail account
+
+If Claude doesn't connect automatically, you can try:
+- Restarting Claude Desktop
+- Using specific prompts like "Check my Gmail" or "Connect to Gmail"
+- Asking Claude to "Use the Gmail MCP server"
+
+## Troubleshooting
+
+If you encounter issues:
+
+1. **Authentication Problems**:
+   - Run `python debug/simple_auth.py` again to re-authenticate
+   - Check that the token file exists at the project root
+
+2. **Connection Issues**:
+   - Make sure the MCP server is running (`python run_gmail_mcp.py`)
+   - Restart Claude Desktop
+   - Check for any error messages in the terminal running the MCP server
+
+3. **JSON Errors**:
+   - Restart the MCP server and Claude Desktop
+   - Run `python debug/diagnose_claude_mcp.py` to diagnose issues
+
+## Advanced Usage
+
+The MCP server provides several tools that Claude can use:
+
+- `get_email_count`: Get the count of emails in your inbox
+- `list_emails`: List emails from your mailbox
+- `get_email`: Get a specific email by ID
+- `search_emails`: Search for emails using Gmail's search syntax
+
+You can ask Claude to use these tools by phrasing your requests naturally, such as:
+- "How many unread emails do I have?"
+- "Show me my recent emails"
+- "Find emails from John about the project"
+- "Get the details of my last email"
 
 ## License
 
-MIT
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Acknowledgements
 
-- [MCP Python SDK](https://github.com/modelcontextprotocol/python-sdk)
-- [MCP Specification](https://spec.modelcontextprotocol.io/specification/2024-11-05/)
-- [Anthropic MCP Documentation](https://www.anthropic.com/news/model-context-protocol)
+- This project uses the Model Context Protocol (MCP) developed by Anthropic
+- Gmail API access is provided by Google's API services
