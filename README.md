@@ -32,10 +32,11 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Install the package and its dependencies:
    ```bash
    uv pip install -e .
    ```
+   This will install all dependencies defined in `pyproject.toml`.
 
 4. Create a `.env` file based on `.env.example`:
    ```bash
@@ -75,6 +76,22 @@ See [docs/structure.md](docs/structure.md) for the detailed project structure.
 ### Implementation Plan
 
 The implementation plan and progress are tracked in [docs/todo.md](docs/todo.md).
+
+### Adding Dependencies
+
+To add new dependencies to the project, update the `dependencies` section in `pyproject.toml`:
+
+```toml
+dependencies = [
+    "mcp-python-sdk>=0.1.0",
+    "your-new-dependency>=1.0.0",
+]
+```
+
+Then reinstall the package:
+```bash
+uv pip install -e .
+```
 
 ### Running Tests
 
