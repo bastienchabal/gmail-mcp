@@ -204,10 +204,14 @@ When discussing or referencing emails, always include the direct link to the ema
 - Email context includes `email_link`
 - Thread context includes `thread_link`
 - Each message in a thread includes its own `email_link`
+- All email-related tools (`get_email`, `list_emails`, `search_emails`, `get_email_overview`) include email links
+
+**IMPORTANT**: You must ALWAYS display these links when discussing specific emails to allow the user to easily access them. This is a mandatory requirement.
 
 Example:
 ```
-You can view this email here: https://mail.google.com/mail/u/0/#inbox/12345abcde
+You have a new email from example@gmail.com with the subject "Meeting Tomorrow".
+You can view it here: https://mail.google.com/mail/u/0/#inbox/12345abcde
 ```
 
 ### Email Confirmation
@@ -217,6 +221,8 @@ Never send an email without explicit user confirmation. Always follow this workf
 1. Create a draft reply using `send_email_reply()`
 2. Show the draft to the user and explicitly ask for confirmation
 3. Only after receiving explicit confirmation, use `confirm_send_email()`
+
+**IMPORTANT**: You must ALWAYS ask for user confirmation before sending any email. This is a mandatory requirement.
 
 Example confirmation request:
 ```

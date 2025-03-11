@@ -38,7 +38,9 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-2. [Enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+2. Enable Google APIs :
+   - [Enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+   - [Enable the Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
 3. Configure the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent):
    - Select "External" user type
    - Add your email as a test user

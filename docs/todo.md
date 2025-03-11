@@ -47,11 +47,11 @@
 - [x] Create email context builders
 - [x] Create thread context builders
 - [x] Create sender context builders
-- [ ] Implement email sending functionality
+- [x] Implement email sending functionality
 - [ ] Add attachment handling
-- [ ] Implement draft management
+- [x] Implement draft management
 - [ ] Add label management
-- [ ] Implement thread management
+- [x] Implement thread management
 - [ ] Add contact integration
 
 ## MCP Resources

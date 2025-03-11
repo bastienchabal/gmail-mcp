@@ -235,13 +235,14 @@ def setup_tools(mcp: FastMCP) -> None:
             
         Returns:
             Dict[str, Any]: The list of emails including:
-                - emails: List of email objects with basic information
+                - emails: List of email objects with basic information and links
                 - next_page_token: Token for pagination (if applicable)
                 
         Example usage:
         1. First check authentication: access auth://status resource
         2. If authenticated, call list_emails(max_results=5, label="INBOX")
         3. If not authenticated, guide user to authenticate first
+        4. Always include the email_link when discussing specific emails with the user
         """
         credentials = get_credentials()
         
@@ -270,15 +271,21 @@ def setup_tools(mcp: FastMCP) -> None:
                 for header in msg["payload"]["headers"]:
                     headers[header["name"].lower()] = header["value"]
                 
+                # Generate a link to the email in Gmail web interface
+                email_id = msg["id"]
+                thread_id = msg["threadId"]
+                email_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{email_id}"
+                
                 # Add to emails list
                 emails.append({
-                    "id": msg["id"],
-                    "thread_id": msg["threadId"],
+                    "id": email_id,
+                    "thread_id": thread_id,
                     "subject": headers.get("subject", "No Subject"),
                     "from": headers.get("from", "Unknown"),
                     "to": headers.get("to", "Unknown"),
                     "date": headers.get("date", "Unknown"),
                     "snippet": msg["snippet"],
+                    "email_link": email_link
                 })
             
             return {
@@ -317,12 +324,14 @@ def setup_tools(mcp: FastMCP) -> None:
                 - body: Email body content
                 - snippet: Short snippet of the email
                 - labels: Email labels
+                - email_link: Direct link to the email in Gmail web interface
                 
         Example usage:
         1. First check authentication: access auth://status resource
         2. Get a list of emails: list_emails()
         3. Extract an email ID from the results
         4. Get the full email: get_email(email_id="...")
+        5. Always include the email_link when discussing the email with the user
         """
         credentials = get_credentials()
         
@@ -356,9 +365,13 @@ def setup_tools(mcp: FastMCP) -> None:
             if body:
                 body = base64.urlsafe_b64decode(body.encode("ASCII")).decode("utf-8")
             
+            # Generate a link to the email in Gmail web interface
+            thread_id = msg["threadId"]
+            email_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{email_id}"
+            
             return {
                 "id": msg["id"],
-                "thread_id": msg["threadId"],
+                "thread_id": thread_id,
                 "subject": headers.get("subject", "No Subject"),
                 "from": headers.get("from", "Unknown"),
                 "to": headers.get("to", "Unknown"),
@@ -367,6 +380,7 @@ def setup_tools(mcp: FastMCP) -> None:
                 "body": body,
                 "snippet": msg["snippet"],
                 "labels": msg["labelIds"],
+                "email_link": email_link
             }
         except HttpError as error:
             logger.error(f"Failed to get email: {error}")
@@ -398,13 +412,14 @@ def setup_tools(mcp: FastMCP) -> None:
         Returns:
             Dict[str, Any]: The search results including:
                 - query: The search query used
-                - emails: List of email objects matching the query
+                - emails: List of email objects matching the query with links
                 - next_page_token: Token for pagination (if applicable)
                 
         Example usage:
         1. First check authentication: access auth://status resource
         2. If authenticated, search for emails: search_emails(query="from:example@gmail.com")
         3. If not authenticated, guide user to authenticate first
+        4. Always include the email_link when discussing specific emails with the user
         """
         credentials = get_credentials()
         
@@ -433,15 +448,21 @@ def setup_tools(mcp: FastMCP) -> None:
                 for header in msg["payload"]["headers"]:
                     headers[header["name"].lower()] = header["value"]
                 
+                # Generate a link to the email in Gmail web interface
+                email_id = msg["id"]
+                thread_id = msg["threadId"]
+                email_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{email_id}"
+                
                 # Add to emails list
                 emails.append({
-                    "id": msg["id"],
-                    "thread_id": msg["threadId"],
+                    "id": email_id,
+                    "thread_id": thread_id,
                     "subject": headers.get("subject", "No Subject"),
                     "from": headers.get("from", "Unknown"),
                     "to": headers.get("to", "Unknown"),
                     "date": headers.get("date", "Unknown"),
                     "snippet": msg["snippet"],
+                    "email_link": email_link
                 })
             
             return {
@@ -462,7 +483,13 @@ def setup_tools(mcp: FastMCP) -> None:
         including counts and recent emails, all in one call.
         
         Returns:
-            Dict[str, Any]: The email overview.
+            Dict[str, Any]: The email overview including:
+                - account: Account information
+                - counts: Email counts by label
+                - recent_emails: List of recent emails with links
+                - unread_count: Number of unread emails
+                
+        Note: Always include the email_link when discussing specific emails with the user.
         """
         credentials = get_credentials()
         
@@ -496,13 +523,20 @@ def setup_tools(mcp: FastMCP) -> None:
                     for header in msg["payload"]["headers"]:
                         headers[header["name"].lower()] = header["value"]
                     
+                    # Generate a link to the email in Gmail web interface
+                    email_id = msg["id"]
+                    thread_id = msg["threadId"]
+                    email_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{email_id}"
+                    
                     # Add to emails list
                     recent_emails.append({
-                        "id": msg["id"],
+                        "id": email_id,
+                        "thread_id": thread_id,
                         "subject": headers.get("subject", "No Subject"),
                         "from": headers.get("from", "Unknown"),
                         "date": headers.get("date", "Unknown"),
                         "snippet": msg["snippet"],
+                        "email_link": email_link
                     })
             
             # Count emails by label
