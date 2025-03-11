@@ -21,7 +21,10 @@ from gmail_mcp.gmail.processor import (
     parse_email_message,
     analyze_thread,
     get_sender_history,
-    extract_email_metadata
+    extract_email_metadata,
+    extract_entities,
+    find_related_emails,
+    analyze_communication_patterns
 )
 from gmail_mcp.mcp.schemas import (
     EmailContextItem,
@@ -247,6 +250,15 @@ def setup_resources(mcp: FastMCP) -> None:
             # Parse the message
             metadata, content = parse_email_message(message)
             
+            # Extract entities from the email content
+            entities = extract_entities(content.plain_text)
+            
+            # Find related emails
+            related_emails = find_related_emails(email_id, max_results=5)
+            
+            # Generate a link to the email in Gmail web interface
+            email_link = f"https://mail.google.com/mail/u/0/#inbox/{metadata.thread_id}"
+            
             # Create context item
             email_context = EmailContextItem(
                 type="email",
@@ -263,7 +275,10 @@ def setup_resources(mcp: FastMCP) -> None:
                     "date": metadata.date.isoformat(),
                     "body": content.plain_text,
                     "has_attachments": metadata.has_attachments,
-                    "labels": metadata.labels
+                    "labels": metadata.labels,
+                    "entities": entities,
+                    "related_emails": related_emails,
+                    "email_link": email_link
                 }
             )
             
@@ -287,24 +302,89 @@ def setup_resources(mcp: FastMCP) -> None:
         Returns:
             Dict[str, Any]: The thread context.
         """
-        # Analyze the thread
-        thread = analyze_thread(thread_id)
-        if not thread:
-            return {"error": "Thread not found or could not be analyzed"}
+        credentials = get_credentials()
+        if not credentials:
+            logger.error("Not authenticated")
+            return {"error": "Not authenticated"}
+            
+        try:
+            # Build the Gmail API service
+            service = build("gmail", "v1", credentials=credentials)
+            
+            # Get the thread
+            thread_data = service.users().threads().get(userId="me", id=thread_id).execute()
+            
+            # Analyze the thread
+            thread = analyze_thread(thread_id)
+            if not thread:
+                return {"error": "Thread not found or could not be analyzed"}
+            
+            # Generate a link to the thread in Gmail web interface
+            thread_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}"
+            
+            # Get all messages in the thread
+            messages = []
+            for message in thread_data.get("messages", []):
+                msg_metadata, msg_content = parse_email_message(message)
+                
+                # Extract entities from each message
+                entities = extract_entities(msg_content.plain_text)
+                
+                # Generate a link to the specific message
+                message_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{msg_metadata.id}"
+                
+                messages.append({
+                    "id": msg_metadata.id,
+                    "subject": msg_metadata.subject,
+                    "from": {
+                        "email": msg_metadata.from_email,
+                        "name": msg_metadata.from_name
+                    },
+                    "to": msg_metadata.to,
+                    "date": msg_metadata.date.isoformat(),
+                    "snippet": message.get("snippet", ""),
+                    "entities": entities,
+                    "email_link": message_link
+                })
+            
+            # Sort messages by date
+            messages.sort(key=lambda x: x["date"])
+            
+            # Analyze communication patterns between participants if there are at least 2 participants
+            communication_patterns = {}
+            if len(thread.participants) >= 2:
+                # Get the user's email
+                profile = service.users().getProfile(userId="me").execute()
+                user_email = profile.get("emailAddress", "")
+                
+                # Analyze patterns with other participants
+                for participant in thread.participants:
+                    participant_email = participant.get("email", "")
+                    if participant_email and participant_email != user_email:
+                        patterns = analyze_communication_patterns(participant_email, user_email)
+                        if patterns and "error" not in patterns:
+                            communication_patterns[participant_email] = patterns
+            
+            # Create context item
+            thread_context = ThreadContextItem(
+                type="thread",
+                content={
+                    "id": thread.id,
+                    "subject": thread.subject,
+                    "message_count": thread.message_count,
+                    "participants": thread.participants,
+                    "last_message_date": thread.last_message_date.isoformat(),
+                    "messages": messages,
+                    "communication_patterns": communication_patterns,
+                    "thread_link": thread_link
+                }
+            )
+            
+            return thread_context.dict()
         
-        # Create context item
-        thread_context = ThreadContextItem(
-            type="thread",
-            content={
-                "id": thread.id,
-                "subject": thread.subject,
-                "message_count": thread.message_count,
-                "participants": thread.participants,
-                "last_message_date": thread.last_message_date.isoformat()
-            }
-        )
-        
-        return thread_context.dict()
+        except Exception as e:
+            logger.error(f"Failed to build thread context: {e}")
+            return {"error": f"Failed to build thread context: {e}"}
     
     @mcp.resource("sender://{sender_email}")
     def build_sender_context(sender_email: str) -> Dict[str, Any]:
@@ -320,25 +400,64 @@ def setup_resources(mcp: FastMCP) -> None:
         Returns:
             Dict[str, Any]: The sender context.
         """
-        # Get sender history
-        sender = get_sender_history(sender_email)
-        if not sender:
-            return {"error": "Sender not found or could not be analyzed"}
+        credentials = get_credentials()
+        if not credentials:
+            logger.error("Not authenticated")
+            return {"error": "Not authenticated"}
+            
+        try:
+            # Build the Gmail API service
+            service = build("gmail", "v1", credentials=credentials)
+            
+            # Get the user's email
+            profile = service.users().getProfile(userId="me").execute()
+            user_email = profile.get("emailAddress", "")
+            
+            # Get sender history
+            sender = get_sender_history(sender_email)
+            if not sender:
+                return {"error": "Sender not found or could not be analyzed"}
+            
+            # Analyze communication patterns
+            communication_patterns = analyze_communication_patterns(sender_email, user_email)
+            
+            # Search for recent emails from this sender
+            query = f"from:{sender_email}"
+            result = service.users().messages().list(userId="me", q=query, maxResults=5).execute()
+            
+            recent_emails = []
+            for message_info in result.get("messages", []):
+                message = service.users().messages().get(userId="me", id=message_info["id"]).execute()
+                metadata = extract_email_metadata(message)
+                
+                recent_emails.append({
+                    "id": metadata.id,
+                    "thread_id": metadata.thread_id,
+                    "subject": metadata.subject,
+                    "date": metadata.date.isoformat(),
+                    "snippet": message.get("snippet", "")
+                })
+            
+            # Create context item
+            sender_context = SenderContextItem(
+                type="sender",
+                content={
+                    "email": sender.email,
+                    "name": sender.name,
+                    "message_count": sender.message_count,
+                    "first_message_date": sender.first_message_date.isoformat() if sender.first_message_date else None,
+                    "last_message_date": sender.last_message_date.isoformat() if sender.last_message_date else None,
+                    "common_topics": sender.common_topics,
+                    "communication_patterns": communication_patterns,
+                    "recent_emails": recent_emails
+                }
+            )
+            
+            return sender_context.dict()
         
-        # Create context item
-        sender_context = SenderContextItem(
-            type="sender",
-            content={
-                "email": sender.email,
-                "name": sender.name,
-                "message_count": sender.message_count,
-                "first_message_date": sender.first_message_date.isoformat() if sender.first_message_date else None,
-                "last_message_date": sender.last_message_date.isoformat() if sender.last_message_date else None,
-                "common_topics": sender.common_topics
-            }
-        )
-        
-        return sender_context.dict()
+        except Exception as e:
+            logger.error(f"Failed to build sender context: {e}")
+            return {"error": f"Failed to build sender context: {e}"}
     
     # Server resources
     @mcp.resource("server://info")

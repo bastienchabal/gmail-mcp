@@ -415,4 +415,158 @@ If you continue to experience problems:
 3. Verify that your Google account has not revoked access
 4. Ensure you're using the latest version of the Gmail MCP
             """
+        }
+    
+    @mcp.prompt("gmail://reply_guide")
+    def reply_guide_prompt() -> Dict[str, Any]:
+        """
+        Email Reply Guide
+        
+        This prompt provides a guide to using the context-aware email reply system.
+        """
+        return {
+            "title": "Context-Aware Email Reply Guide",
+            "description": "Learn how to craft personalized, context-aware email replies",
+            "content": """
+# Context-Aware Email Reply Guide
+
+The Gmail MCP provides powerful tools for crafting personalized, context-aware email replies. This guide explains how to use these tools to create replies that consider the full context of your communication history.
+
+## Understanding Context-Aware Replies
+
+Context-aware replies take into account:
+
+- The content of the original email
+- The history of the conversation thread
+- Your relationship with the sender
+- Communication patterns between you and the sender
+- Related emails and topics
+- Entities mentioned in the email (dates, times, action items, etc.)
+
+## Reply Workflow
+
+### 1. Find the Email to Reply To
+
+First, find the email you want to reply to:
+
+```
+# Get recent emails
+list_emails(max_results=10, label="INBOX")
+
+# Or search for a specific email
+search_emails(query="from:example@gmail.com")
+```
+
+### 2. Prepare the Reply Context
+
+Use the `prepare_email_reply` tool to gather comprehensive context:
+
+```
+# Replace with the actual email ID
+reply_context = prepare_email_reply(email_id="18abc123def456")
+```
+
+### 3. Analyze the Context
+
+The reply context includes:
+
+- **Original Email**: The email you're replying to
+- **Thread Context**: Information about the conversation thread
+- **Sender Context**: Information about the sender and your history with them
+- **Communication Patterns**: Analysis of how you and the sender typically communicate
+- **Entities**: Important information extracted from the email (dates, times, action items)
+- **Related Emails**: Other emails that provide additional context
+
+### 4. Craft a Personalized Reply
+
+Based on the context, craft a reply that:
+
+- Matches the formality level of your previous communications
+- Addresses all action items or questions
+- References relevant history or related emails
+- Maintains your typical response style with this sender
+
+### 5. Create a Draft Reply
+
+Use the `send_email_reply` tool to create a draft reply:
+
+```
+# Replace with the actual email ID and your reply text
+draft_result = send_email_reply(
+    email_id="18abc123def456",
+    reply_text="Your personalized reply here...",
+    include_original=True  # Whether to include the original email in the reply
+)
+```
+
+### 6. ALWAYS Ask for User Confirmation
+
+⚠️ **CRITICAL STEP** ⚠️
+
+You must ALWAYS ask for the user's explicit confirmation before sending any email. This is a mandatory step:
+
+```
+# After creating the draft, show it to the user and ask:
+"Here's the draft reply I've created. Would you like me to send it? If yes, I'll send it. If you'd like to make changes, please let me know."
+```
+
+### 7. Send Only After Explicit Confirmation
+
+Only after receiving explicit confirmation from the user, send the email:
+
+```
+# Only after user confirms:
+confirm_send_email(draft_id=draft_result["draft_id"])
+```
+
+## Always Include Email Links
+
+When discussing or referencing emails, always include the direct link to the email in Gmail's web interface. These links are automatically included in the context:
+
+- Email context includes `email_link`
+- Thread context includes `thread_link`
+- Each message in a thread includes its own `email_link`
+
+Always display these links when discussing specific emails to allow the user to easily access them.
+
+## Example: Analyzing Communication Patterns
+
+The communication patterns analysis provides insights like:
+
+- **Frequency**: How often you communicate with this sender
+- **Response Time**: Your typical response time to this sender
+- **Formality**: Whether your communications are typically formal or informal
+- **Message Length**: Typical length of messages between you and the sender
+- **Common Topics**: Topics that frequently appear in your communications
+
+Use these insights to maintain consistency in your communication style.
+
+## Example: Entity Extraction
+
+The entity extraction identifies important information like:
+
+- **Dates**: Mentioned dates that might indicate deadlines or events
+- **Times**: Specific times mentioned in the email
+- **Action Items**: Tasks or requests that require your attention
+- **URLs**: Links that you might need to reference
+- **Email Addresses**: Other people mentioned in the conversation
+
+Address these entities explicitly in your reply to ensure a complete response.
+
+## Tips for Effective Replies
+
+1. **Match Tone and Style**: Use the communication patterns analysis to match your previous tone
+2. **Address All Points**: Use the entity extraction to ensure you address all questions and action items
+3. **Reference History**: When relevant, reference previous communications from the thread context
+4. **Provide Context**: If referencing related emails, provide enough context for clarity
+5. **Be Concise**: While being comprehensive, keep your reply as concise as possible
+6. **Include Links**: Always include the email link when discussing a specific email
+7. **Always Get Confirmation**: Never send an email without explicit user confirmation
+
+## Important Reminders
+
+1. **NEVER send an email without explicit user confirmation**
+2. **ALWAYS include email links when referencing specific emails**
+3. **Use the full context to craft personalized, relevant replies**
+            """
         } 

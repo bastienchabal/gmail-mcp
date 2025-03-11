@@ -55,7 +55,6 @@ logs/
 
 # Project
 .cursorrules
-docs/
 debug/
 tokens.json
 tokens.json.bak

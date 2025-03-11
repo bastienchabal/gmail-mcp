@@ -99,4 +99,67 @@ class SenderInfo(BaseModel):
     message_count: int
     first_message_date: Optional[datetime] = None
     last_message_date: Optional[datetime] = None
-    common_topics: List[str] = [] 
+    common_topics: List[str] = []
+
+
+class EntityExtraction(BaseModel):
+    """
+    Schema for entity extraction results.
+    
+    This schema defines the structure of entity extraction results
+    from email content analysis.
+    """
+    dates: List[str] = []
+    times: List[str] = []
+    phone_numbers: List[str] = []
+    email_addresses: List[str] = []
+    urls: List[str] = []
+    action_items: List[str] = []
+
+
+class CommunicationPattern(BaseModel):
+    """
+    Schema for communication pattern analysis.
+    
+    This schema defines the structure of communication pattern analysis
+    between two email addresses.
+    """
+    message_count: int
+    communication_exists: bool
+    first_contact: Optional[str] = None
+    last_contact: Optional[str] = None
+    frequency: Optional[str] = None
+    avg_response_time_hours: Optional[float] = None
+    communication_style: Optional[Dict[str, Any]] = None
+    common_topics: List[str] = []
+
+
+class RelatedEmail(BaseModel):
+    """
+    Schema for related email information.
+    
+    This schema defines the structure of related email information
+    that is returned by the find_related_emails function.
+    """
+    id: str
+    thread_id: str
+    subject: str
+    from_email: str
+    from_name: str
+    date: str
+    relevance_score: float
+
+
+class EmailReplyContext(BaseModel):
+    """
+    Schema for email reply context.
+    
+    This schema defines the structure of the context used for
+    generating email replies.
+    """
+    original_email: Dict[str, Any]
+    thread_context: Optional[Dict[str, Any]] = None
+    sender_context: Optional[Dict[str, Any]] = None
+    communication_patterns: Optional[Dict[str, Any]] = None
+    entities: Optional[Dict[str, List[str]]] = None
+    related_emails: Optional[List[Dict[str, Any]]] = None 
