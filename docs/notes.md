@@ -631,3 +631,85 @@ After centralizing all MCP components, we've cleaned up the project by removing 
    - Continue to refine the centralized MCP components
    - Add more comprehensive error handling
    - Implement additional features as needed
+
+## Calendar Integration (2023-05-25)
+
+To enhance the Gmail MCP server with calendar functionality, a comprehensive Google Calendar integration has been implemented:
+
+### Calendar Tools Implementation
+
+1. **Event Creation**: Implemented `create_calendar_event()` tool that allows Claude to create calendar events with the following features:
+   - Support for both ISO format and natural language date/time parsing
+   - Automatic duration calculation (defaults to 1 hour if end time not specified)
+   - Optional fields for description, location, attendees, and color
+   - Direct links to the created events in Google Calendar
+
+2. **Event Detection**: Implemented `detect_events_from_email()` tool that analyzes email content to identify potential calendar events:
+   - Uses regex patterns to identify event-related language
+   - Extracts dates, times, and locations from email content
+   - Combines date and time information to create datetime objects
+   - Provides confidence levels for detected events
+   - Returns structured event data ready for calendar creation
+
+3. **Event Listing**: Implemented `list_calendar_events()` tool to retrieve upcoming events:
+   - Flexible time range specification with natural language support
+   - Search capabilities for finding specific events
+   - Pagination support for handling large numbers of events
+   - Direct links to each event in Google Calendar
+
+### Design Decisions
+
+1. **Natural Language Parsing**: Used Python's dateutil.parser for flexible date/time parsing:
+   - Allows users to specify times like "5pm next wednesday" or "tomorrow at 3pm"
+   - Falls back to ISO format parsing for precise datetime specifications
+   - Handles a wide variety of date/time formats and expressions
+
+2. **Event Detection Approach**: Implemented a multi-layered approach to event detection:
+   - First looks for explicit event patterns (meeting, call, appointment, etc.)
+   - Then searches for complete datetime expressions
+   - Finally combines separate date and time entities if needed
+   - This provides robust detection even in informal email content
+
+3. **User Confirmation Workflow**: Designed the tools to require explicit user confirmation:
+   - Event detection presents potential events to the user
+   - Claude must ask for confirmation before creating events
+   - This ensures users maintain control over their calendar
+
+4. **Direct Links**: Added event_link generation for all calendar operations:
+   - Every event includes a direct link to Google Calendar
+   - Claude is instructed to always include these links when discussing events
+   - This provides users with easy access to view and edit events
+
+### Documentation Updates
+
+1. **Function Documentation**: Added comprehensive docstrings to all calendar tools:
+   - Detailed parameter descriptions
+   - Usage examples
+   - Prerequisites and requirements
+   - Return value documentation
+
+2. **User Guidelines**: Updated the functions.md documentation with:
+   - New section on Calendar Event Links
+   - Guidelines for Event Detection and Creation
+   - Example workflows for calendar integration
+
+3. **Project Documentation**: Updated project.md and structure.md to reflect the new calendar capabilities
+
+### Implementation Challenges
+
+1. **Date/Time Parsing**: Handling the variety of ways dates and times can be expressed in emails required a flexible approach:
+   - Implemented multiple parsing strategies with fallbacks
+   - Added error handling to gracefully handle parsing failures
+   - Used regex patterns to identify common date/time formats
+
+2. **Event Title Extraction**: Determining appropriate event titles from email content:
+   - Implemented pattern matching for common event-related phrases
+   - Used subject line as fallback when no clear title is found
+   - Added prefix to clarify when events are extracted from emails
+
+3. **Type Safety**: Ensuring proper typing for optional parameters:
+   - Used Optional[Type] for all optional parameters
+   - Added proper error handling for None values
+   - Fixed linter errors related to optional parameters
+
+The calendar integration enhances the Gmail MCP server by allowing Claude to not only read and respond to emails but also manage the user's calendar based on email content, creating a more comprehensive email assistant experience.

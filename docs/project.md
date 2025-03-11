@@ -47,6 +47,10 @@ The application follows a modular architecture with the following components:
 ### Actions
 - Smart email replies with conversation context
 - Calendar event creation from email content
+  - Automatic event detection from email content
+  - Natural language parsing for event details
+  - Direct calendar event creation with confirmation
+  - Event links for easy access
 - Task generation based on action items in emails
 - Intelligent label application
 - Draft creation with suggested content

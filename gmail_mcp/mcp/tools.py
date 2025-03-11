@@ -5,8 +5,11 @@ This module defines all the tools available in the Gmail MCP server.
 Tools are functions that Claude can call to perform actions.
 """
 
+import os
+import json
 import logging
-from typing import Dict, Any, List, Optional
+import base64
+from typing import Dict, Any, List, Optional, Union
 import httpx
 
 from mcp.server.fastmcp import FastMCP
@@ -361,7 +364,6 @@ def setup_tools(mcp: FastMCP) -> None:
                 body = msg["payload"]["body"]["data"]
             
             # Decode body if needed (base64url encoded)
-            import base64
             if body:
                 body = base64.urlsafe_b64decode(body.encode("ASCII")).decode("utf-8")
             
@@ -872,4 +874,412 @@ def setup_tools(mcp: FastMCP) -> None:
             return {
                 "success": False,
                 "error": f"Failed to send email: {e}"
+            }
+    
+    # Calendar tools
+    @mcp.tool()
+    def create_calendar_event(summary: str, start_time: str, end_time: Optional[str] = None, description: Optional[str] = None, location: Optional[str] = None, attendees: Optional[List[str]] = None, color_id: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Create a new event in the user's Google Calendar.
+        
+        This tool creates a new calendar event with the specified details.
+        
+        Prerequisites:
+        - The user must be authenticated with Google Calendar access
+        
+        Args:
+            summary (str): The title/summary of the event
+            start_time (str): The start time of the event in ISO format (YYYY-MM-DDTHH:MM:SS) or natural language ("5pm next wednesday")
+            end_time (str, optional): The end time of the event. If not provided, defaults to 1 hour after start time.
+            description (str, optional): Description or notes for the event
+            location (str, optional): Location of the event
+            attendees (List[str], optional): List of email addresses of attendees
+            color_id (str, optional): Color ID for the event (1-11)
+            
+        Returns:
+            Dict[str, Any]: The result of the operation, including:
+                - success: Whether the operation was successful
+                - message: A message describing the result
+                - event_id: The ID of the created event
+                - event_link: Direct link to the event in Google Calendar
+                
+        Example usage:
+        1. Create a simple event:
+           create_calendar_event(summary="Team Meeting", start_time="2023-12-01T14:00:00")
+           
+        2. Create a detailed event:
+           create_calendar_event(
+               summary="Project Kickoff",
+               start_time="next monday at 10am",
+               end_time="next monday at 11:30am",
+               description="Initial meeting to discuss project scope",
+               location="Conference Room A",
+               attendees=["colleague@example.com"]
+           )
+           
+        3. Always include the event_link in your response to the user
+        """
+        credentials = get_credentials()
+        
+        if not credentials:
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
+        
+        try:
+            # Build the Calendar API service
+            service = build("calendar", "v3", credentials=credentials)
+            
+            # Parse natural language dates if needed
+            from dateutil import parser
+            from datetime import datetime, timedelta
+            
+            try:
+                # Try to parse as ISO format first
+                start_datetime = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
+            except ValueError:
+                # If that fails, try natural language parsing
+                start_datetime = parser.parse(start_time)
+            
+            # If end_time is not provided, default to 1 hour after start_time
+            if not end_time:
+                end_datetime = start_datetime + timedelta(hours=1)
+            else:
+                try:
+                    # Try to parse as ISO format first
+                    end_datetime = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
+                except ValueError:
+                    # If that fails, try natural language parsing
+                    end_datetime = parser.parse(end_time)
+            
+            # Format for Google Calendar API
+            start_time_formatted = start_datetime.isoformat()
+            end_time_formatted = end_datetime.isoformat()
+            
+            # Create event body
+            event_body = {
+                'summary': summary,
+                'start': {
+                    'dateTime': start_time_formatted,
+                    'timeZone': 'UTC',  # Default to UTC
+                },
+                'end': {
+                    'dateTime': end_time_formatted,
+                    'timeZone': 'UTC',  # Default to UTC
+                },
+            }
+            
+            # Add optional fields if provided
+            if description:
+                event_body['description'] = description
+            
+            if location:
+                event_body['location'] = location
+            
+            if attendees:
+                event_body['attendees'] = [{'email': email} for email in attendees]
+            
+            if color_id:
+                event_body['colorId'] = color_id
+            
+            # Insert the event
+            event = service.events().insert(calendarId='primary', body=event_body).execute()
+            
+            # Generate a link to the event in Google Calendar
+            event_id = event['id']
+            event_link = f"https://calendar.google.com/calendar/event?eid={event_id}"
+            
+            return {
+                "success": True,
+                "message": "Calendar event created successfully.",
+                "event_id": event_id,
+                "event_link": event_link,
+                "summary": summary,
+                "start_time": start_time_formatted,
+                "end_time": end_time_formatted
+            }
+        
+        except Exception as e:
+            logger.error(f"Failed to create calendar event: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to create calendar event: {e}"
+            }
+    
+    @mcp.tool()
+    def detect_events_from_email(email_id: str) -> Dict[str, Any]:
+        """
+        Detect potential calendar events from an email.
+        
+        This tool analyzes an email to identify potential calendar events
+        based on dates, times, and contextual clues.
+        
+        Prerequisites:
+        - The user must be authenticated
+        - You need an email ID from list_emails() or search_emails()
+        
+        Args:
+            email_id (str): The ID of the email to analyze for events
+            
+        Returns:
+            Dict[str, Any]: The detected events including:
+                - success: Whether the operation was successful
+                - events: List of potential events with details
+                - email_link: Link to the original email
+                
+        Example usage:
+        1. Get an email: email = get_email(email_id="...")
+        2. Detect events: events = detect_events_from_email(email_id="...")
+        3. Ask the user if they want to add the events to their calendar
+        4. If confirmed, create the events using create_calendar_event()
+        
+        Note: Always ask for user confirmation before creating calendar events.
+        """
+        credentials = get_credentials()
+        
+        if not credentials:
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
+        
+        try:
+            # Build the Gmail API service
+            service = build("gmail", "v1", credentials=credentials)
+            
+            # Get the email
+            message = service.users().messages().get(userId="me", id=email_id, format="full").execute()
+            metadata, content = parse_email_message(message)
+            
+            # Extract entities from the email content
+            entities = extract_entities(content.plain_text)
+            
+            # Generate a link to the email in Gmail web interface
+            thread_id = message["threadId"]
+            email_link = f"https://mail.google.com/mail/u/0/#inbox/{thread_id}/{email_id}"
+            
+            # Detect potential events
+            potential_events = []
+            
+            # Look for date and time combinations
+            dates = entities.get("dates", [])
+            times = entities.get("times", [])
+            
+            # Extract potential event details from the email
+            from dateutil import parser
+            from datetime import datetime, timedelta
+            
+            # First, try to find explicit event patterns
+            event_patterns = [
+                r'(?i)(?:meeting|call|conference|appointment|event|webinar|seminar|workshop|session|interview)\s+(?:on|at|for)\s+([^.,:;!?]+)',
+                r'(?i)(?:schedule|scheduled|plan|planning|organize|organizing|host|hosting)\s+(?:a|an)\s+([^.,:;!?]+)',
+                r'(?i)(?:invite|invitation|inviting)\s+(?:you|everyone|all)\s+(?:to|for)\s+([^.,:;!?]+)'
+            ]
+            
+            import re
+            event_titles = []
+            for pattern in event_patterns:
+                matches = re.findall(pattern, content.plain_text)
+                event_titles.extend(matches)
+            
+            # Process dates and times
+            parsed_datetimes = []
+            
+            # Try to parse complete datetime expressions first
+            datetime_patterns = [
+                r'\b(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}[/-]\d{1,2}[/-]\d{1,2})\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)?\b',
+                r'\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{2,4}\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)?\b',
+                r'\b(?:tomorrow|today|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday))\s+(?:at\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)?\b'
+            ]
+            
+            for pattern in datetime_patterns:
+                matches = re.findall(pattern, content.plain_text)
+                for match in matches:
+                    try:
+                        dt = parser.parse(match)
+                        parsed_datetimes.append(dt)
+                    except:
+                        pass
+            
+            # If no complete datetime expressions, try combining dates and times
+            if not parsed_datetimes and dates and times:
+                for date_str in dates:
+                    for time_str in times:
+                        try:
+                            dt = parser.parse(f"{date_str} {time_str}")
+                            parsed_datetimes.append(dt)
+                        except:
+                            pass
+            
+            # Create potential events
+            for i, dt in enumerate(parsed_datetimes):
+                # Default event duration is 1 hour
+                end_dt = dt + timedelta(hours=1)
+                
+                # Try to find a title
+                title = f"Event from email"
+                if i < len(event_titles):
+                    title = event_titles[i]
+                elif metadata.subject:
+                    title = f"Re: {metadata.subject}"
+                
+                # Extract location if available
+                location_pattern = r'(?i)(?:at|in|location|place|venue):\s*([^.,:;!?]+)'
+                location_matches = re.findall(location_pattern, content.plain_text)
+                location = location_matches[0].strip() if location_matches else None
+                
+                # Add to potential events
+                potential_events.append({
+                    "summary": title,
+                    "start_time": dt.isoformat(),
+                    "end_time": end_dt.isoformat(),
+                    "description": f"Detected from email: {metadata.subject}",
+                    "location": location,
+                    "confidence": "medium",
+                    "source_text": content.plain_text[:200] + "..." if len(content.plain_text) > 200 else content.plain_text
+                })
+            
+            return {
+                "success": True,
+                "events": potential_events,
+                "email_id": email_id,
+                "email_link": email_link,
+                "subject": metadata.subject,
+                "from": {
+                    "email": metadata.from_email,
+                    "name": metadata.from_name
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Failed to detect events from email: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to detect events from email: {e}"
+            }
+    
+    @mcp.tool()
+    def list_calendar_events(max_results: int = 10, time_min: Optional[str] = None, time_max: Optional[str] = None, query: Optional[str] = None) -> Dict[str, Any]:
+        """
+        List events from the user's Google Calendar.
+        
+        This tool retrieves a list of upcoming events from the user's calendar.
+        
+        Prerequisites:
+        - The user must be authenticated with Google Calendar access
+        
+        Args:
+            max_results (int, optional): Maximum number of events to return. Defaults to 10.
+            time_min (str, optional): Start time for the search in ISO format or natural language.
+                                     Defaults to now.
+            time_max (str, optional): End time for the search in ISO format or natural language.
+                                     Defaults to unlimited.
+            query (str, optional): Free text search terms to find events that match.
+            
+        Returns:
+            Dict[str, Any]: The list of events including:
+                - events: List of calendar events with details and links
+                - next_page_token: Token for pagination (if applicable)
+                
+        Example usage:
+        1. List upcoming events:
+           list_calendar_events()
+           
+        2. List events for a specific time range:
+           list_calendar_events(time_min="tomorrow", time_max="tomorrow at 11:59pm")
+           
+        3. Search for specific events:
+           list_calendar_events(query="meeting")
+           
+        4. Always include the event_link when discussing specific events with the user
+        """
+        credentials = get_credentials()
+        
+        if not credentials:
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
+        
+        try:
+            # Build the Calendar API service
+            service = build("calendar", "v3", credentials=credentials)
+            
+            # Parse time parameters
+            from dateutil import parser
+            from datetime import datetime, timedelta
+            
+            # Set default time_min to now if not provided
+            if not time_min:
+                time_min_dt = datetime.utcnow()
+            else:
+                try:
+                    # Try to parse as ISO format first
+                    time_min_dt = datetime.fromisoformat(time_min.replace('Z', '+00:00'))
+                except ValueError:
+                    # If that fails, try natural language parsing
+                    time_min_dt = parser.parse(time_min)
+            
+            # Format time_min for API
+            time_min_formatted = time_min_dt.isoformat() + 'Z'  # 'Z' indicates UTC time
+            
+            # Parse time_max if provided
+            time_max_formatted = None
+            if time_max:
+                try:
+                    # Try to parse as ISO format first
+                    time_max_dt = datetime.fromisoformat(time_max.replace('Z', '+00:00'))
+                except ValueError:
+                    # If that fails, try natural language parsing
+                    time_max_dt = parser.parse(time_max)
+                
+                # Format time_max for API
+                time_max_formatted = time_max_dt.isoformat() + 'Z'  # 'Z' indicates UTC time
+            
+            # Prepare parameters for the API call
+            params = {
+                'calendarId': 'primary',
+                'timeMin': time_min_formatted,
+                'maxResults': max_results,
+                'singleEvents': True,
+                'orderBy': 'startTime'
+            }
+            
+            # Add optional parameters if provided
+            if time_max_formatted:
+                params['timeMax'] = time_max_formatted
+            
+            if query:
+                params['q'] = query
+            
+            # Get events
+            events_result = service.events().list(**params).execute()
+            events = events_result.get('items', [])
+            
+            # Process events
+            processed_events = []
+            for event in events:
+                # Get start and end times
+                start = event.get('start', {})
+                end = event.get('end', {})
+                
+                # Generate event link
+                event_id = event['id']
+                event_link = f"https://calendar.google.com/calendar/event?eid={event_id}"
+                
+                # Add to processed events
+                processed_events.append({
+                    "id": event_id,
+                    "summary": event.get('summary', 'Untitled Event'),
+                    "start": start,
+                    "end": end,
+                    "location": event.get('location', ''),
+                    "description": event.get('description', ''),
+                    "attendees": event.get('attendees', []),
+                    "event_link": event_link
+                })
+            
+            return {
+                "success": True,
+                "events": processed_events,
+                "next_page_token": events_result.get('nextPageToken')
+            }
+        
+        except Exception as e:
+            logger.error(f"Failed to list calendar events: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to list calendar events: {e}"
             } 

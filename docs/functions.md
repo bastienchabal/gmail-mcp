@@ -9,6 +9,7 @@ This document provides a comprehensive guide to all the tools, resources, and pr
 - [Tools](#tools)
   - [Authentication Tools](#authentication-tools)
   - [Email Tools](#email-tools)
+  - [Calendar Tools](#calendar-tools)
 - [Resources](#resources)
   - [Authentication Resources](#authentication-resources)
   - [Gmail Resources](#gmail-resources)
@@ -58,6 +59,14 @@ Tools are functions that Claude can call to perform actions. Here's how to use t
 | `prepare_email_reply(email_id)` | Prepare a context-rich reply to an email | `prepare_email_reply(email_id="18abc123def456")` |
 | `send_email_reply(email_id, reply_text, include_original)` | Create a draft reply to an email | `send_email_reply(email_id="18abc123def456", reply_text="Your reply here", include_original=True)` |
 | `confirm_send_email(draft_id)` | Send a draft email after user confirmation | `confirm_send_email(draft_id="r-123456789")` |
+
+### Calendar Tools
+
+| Tool | Description | Example Usage |
+|------|-------------|---------------|
+| `create_calendar_event(summary, start_time, end_time, description, location, attendees, color_id)` | Create a new event in Google Calendar | `create_calendar_event(summary="Team Meeting", start_time="5pm next wednesday")` |
+| `detect_events_from_email(email_id)` | Detect potential calendar events from an email | `detect_events_from_email(email_id="18abc123def456")` |
+| `list_calendar_events(max_results, time_min, time_max, query)` | List events from the user's Google Calendar | `list_calendar_events(time_min="tomorrow", time_max="tomorrow at 11:59pm")` |
 
 ## Resources
 
@@ -212,6 +221,36 @@ Example:
 ```
 You have a new email from example@gmail.com with the subject "Meeting Tomorrow".
 You can view it here: https://mail.google.com/mail/u/0/#inbox/12345abcde
+```
+
+### Calendar Event Links
+
+When discussing or referencing calendar events, always include the direct link to the event in Google Calendar. These links are automatically included in the context:
+
+- All calendar events include `event_link`
+- Calendar event creation returns an `event_link`
+- Events detected from emails can be converted to calendar events with links
+
+**IMPORTANT**: You must ALWAYS display these links when discussing specific calendar events to allow the user to easily access them. This is a mandatory requirement.
+
+Example:
+```
+I've added the "Team Meeting" event to your calendar for next Wednesday at 5:00 PM.
+You can view and edit it here: https://calendar.google.com/calendar/event?eid=12345abcde
+```
+
+### Event Detection and Creation
+
+When reading emails, Claude should proactively detect potential calendar events and offer to add them to the user's calendar:
+
+1. Use `detect_events_from_email()` to identify potential events in emails
+2. Present the detected events to the user and ask for confirmation
+3. Only after receiving explicit confirmation, use `create_calendar_event()` to add the event
+
+Example workflow:
+```
+I noticed this email contains what appears to be a meeting invitation for tomorrow at 3:00 PM.
+Would you like me to add this to your calendar?
 ```
 
 ### Email Confirmation

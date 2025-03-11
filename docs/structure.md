@@ -96,7 +96,8 @@ All MCP resources are now centralized in `gmail_mcp/mcp/resources.py`. These inc
 All MCP tools are now centralized in `gmail_mcp/mcp/tools.py`. These include:
 
 - Authentication tools: `login_tool()`, `authenticate()`, `process_auth_code_tool()`, `logout()`, `check_auth_status()`
-- Email tools: `get_email_count()`, `list_emails()`, `get_email()`, `search_emails()`, `get_email_overview()`
+- Email tools: `get_email_count()`, `list_emails()`, `get_email()`, `search_emails()`, `get_email_overview()`, `prepare_email_reply()`, `send_email_reply()`, `confirm_send_email()`
+- Calendar tools: `create_calendar_event()`, `detect_events_from_email()`, `list_calendar_events()`
 
 ### MCP Prompts
 

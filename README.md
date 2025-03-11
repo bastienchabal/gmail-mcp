@@ -7,6 +7,7 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
 - **Deep Email Analysis**: Provides comprehensive context from entire conversation threads
 - **Context-Aware Responses**: Generates responses considering full communication history
 - **Intelligent Action Suggestions**: Analyzes email content for calendar events, tasks, and follow-ups
+- **Calendar Integration**: Detects events in emails and creates calendar entries with natural language support
 - **Advanced Search**: Searches across entire email history with semantic understanding
 - **Personalization**: Adapts to your communication style with specific contacts
 
@@ -44,7 +45,9 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
 3. Configure the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent):
    - Select "External" user type
    - Add your email as a test user
-   - Add the scope: `https://www.googleapis.com/auth/gmail/modify`
+   - Add the scopes: 
+     - `https://www.googleapis.com/auth/gmail.modify`
+     - `https://www.googleapis.com/auth/calendar.events`
 4. Create [OAuth 2.0 credentials](https://console.cloud.google.com/apis/credentials):
    - Choose "Desktop app" as the application type
    - Download the JSON credentials file
@@ -76,7 +79,7 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
         "TOKEN_STORAGE_PATH": "/<absolute-path>/gmail-mcp/tokens.json",
         "TOKEN_ENCRYPTION_KEY": "45b9a6655b42fb9e41a8671e8edd2c2345c0eb42cb334d30a2f403b61cb7d0e8",
         "MCP_VERSION": "2025-03-07",
-        "CALENDAR_API_ENABLED": "false",
+        "CALENDAR_API_ENABLED": "true",
         "CALENDAR_API_SCOPES": "https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events"
       }
     }
@@ -120,16 +123,25 @@ If you encounter issues:
 
 The MCP server provides several tools that Claude can use:
 
+### Email Tools
 - `get_email_count`: Get the count of emails in your inbox
 - `list_emails`: List emails from your mailbox
 - `get_email`: Get a specific email by ID
 - `search_emails`: Search for emails using Gmail's search syntax
+
+### Calendar Tools
+- `create_calendar_event`: Create a new event in Google Calendar
+- `detect_events_from_email`: Detect potential calendar events from an email
+- `list_calendar_events`: List events from your Google Calendar
 
 You can ask Claude to use these tools by phrasing your requests naturally, such as:
 - "How many unread emails do I have?"
 - "Show me my recent emails"
 - "Find emails from John about the project"
 - "Get the details of my last email"
+- "Add a meeting with the team at 3pm tomorrow"
+- "Check if there are any events in this email"
+- "What's on my calendar for next week?"
 
 ## License
 
