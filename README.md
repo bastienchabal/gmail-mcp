@@ -46,8 +46,14 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
    - Select "External" user type
    - Add your email as a test user
    - Add the scopes: 
+     - `https://www.googleapis.com/auth/gmail.readonly`
+     - `https://www.googleapis.com/auth/gmail.send`
+     - `https://www.googleapis.com/auth/gmail.labels`
      - `https://www.googleapis.com/auth/gmail.modify`
+     - `https://www.googleapis.com/auth/calendar.readonly`
      - `https://www.googleapis.com/auth/calendar.events`
+     - `https://www.googleapis.com/auth/userinfo.email`
+     - `https://www.googleapis.com/auth/userinfo.profile`
 4. Create [OAuth 2.0 credentials](https://console.cloud.google.com/apis/credentials):
    - Choose "Desktop app" as the application type
    - Download the JSON credentials file
@@ -74,7 +80,7 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
         "GOOGLE_CLIENT_ID": "<your-client-id>",
         "GOOGLE_CLIENT_SECRET": "<your-client-secret>",
         "GOOGLE_REDIRECT_URI": "http://localhost:8000/auth/callback",
-        "GOOGLE_AUTH_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send",
+        "GOOGLE_AUTH_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/userinfo.profile",
         "GMAIL_API_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify",
         "TOKEN_STORAGE_PATH": "/<absolute-path>/gmail-mcp/tokens.json",
         "TOKEN_ENCRYPTION_KEY": "45b9a6655b42fb9e41a8671e8edd2c2345c0eb42cb334d30a2f403b61cb7d0e8",
@@ -86,6 +92,24 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
   }
 }
 ```
+
+### Important Note on Calendar Integration
+
+If you've previously authenticated with the Gmail MCP server and are now enabling Calendar integration, you'll need to re-authenticate to grant the additional Calendar API scopes. You can do this by:
+
+1. Deleting the existing tokens.json file (if present)
+2. Restarting the MCP server
+3. Following the authentication process again
+
+Alternatively, you can use the provided re-authentication script:
+
+```bash
+python debug/reauth_calendar.py
+```
+
+This script will automatically delete your existing tokens and guide you through the re-authentication process with the Calendar API scopes.
+
+This ensures that your OAuth token includes all the necessary scopes for both Gmail and Calendar operations.
 
 ### Step 2: Use Claude Desktop
 
@@ -118,6 +142,12 @@ If you encounter issues:
 3. **JSON Errors**:
    - Restart the MCP server and Claude Desktop
    - Run `python debug/diagnose_claude_mcp.py` to diagnose issues
+
+4. **Calendar API Issues**:
+   - Make sure you've enabled the Calendar API in Google Cloud Console
+   - Check that you've granted all the necessary scopes during authentication
+   - Run `python debug/reauth_calendar.py` to re-authenticate with Calendar API scopes
+   - Verify that `CALENDAR_API_ENABLED` is set to `true` in your environment variables
 
 ## Advanced Usage
 

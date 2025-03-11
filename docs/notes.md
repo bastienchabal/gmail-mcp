@@ -713,3 +713,51 @@ To enhance the Gmail MCP server with calendar functionality, a comprehensive Goo
    - Fixed linter errors related to optional parameters
 
 The calendar integration enhances the Gmail MCP server by allowing Claude to not only read and respond to emails but also manage the user's calendar based on email content, creating a more comprehensive email assistant experience.
+
+## Calendar API Authorization Update (2023-05-26)
+
+To address authorization issues with the Calendar API integration, several improvements have been made to the OAuth authentication process:
+
+### OAuth Scopes Management
+
+1. **Dynamic Scopes Configuration**: Modified the OAuth module to dynamically include Calendar API scopes based on configuration:
+   - Updated the hardcoded `SCOPES` variable to use scopes from the configuration
+   - Added logic to include Calendar API scopes when `calendar_api_enabled` is true
+   - Ensured user info scopes are always included for profile information
+
+2. **Comprehensive Scope Documentation**: Updated the README with detailed information about required scopes:
+   - Listed all required scopes for the OAuth consent screen configuration
+   - Updated the environment variables example to include all necessary scopes
+   - Added a note about re-authentication when enabling Calendar integration
+
+3. **Re-authentication Helper**: Created a dedicated script to help users re-authenticate with Calendar API scopes:
+   - Added `debug/reauth_calendar.py` script that guides users through the process
+   - Script automatically deletes existing tokens and initiates the OAuth flow
+   - Provides clear feedback about the scopes being requested
+
+### Implementation Details
+
+1. **Scope Combination Logic**: Implemented a hierarchical approach to scope management:
+   - Base Gmail API scopes are always included
+   - Calendar API scopes are added conditionally based on configuration
+   - User info scopes are always included for profile information
+   - Duplicate scopes are automatically handled to prevent redundancy
+
+2. **Configuration-Driven Approach**: Made the OAuth process fully configuration-driven:
+   - All scopes are now derived from environment variables
+   - No hardcoded scopes in the code, improving flexibility
+   - Clear separation between Gmail and Calendar scopes
+
+3. **User Guidance**: Added comprehensive guidance for users:
+   - Clear instructions for re-authentication in the README
+   - Detailed troubleshooting section for Calendar API issues
+   - Script with user-friendly output for the re-authentication process
+
+### Benefits
+
+1. **Seamless Integration**: Users can now enable Calendar integration without manual intervention in the code
+2. **Clear Guidance**: Documentation clearly explains the steps needed for Calendar authorization
+3. **Flexible Configuration**: All scopes can be configured through environment variables
+4. **Improved User Experience**: Re-authentication script simplifies the process for users
+
+These changes ensure that the Calendar API integration works seamlessly with the proper authorization scopes, allowing Claude to create and manage calendar events as requested.

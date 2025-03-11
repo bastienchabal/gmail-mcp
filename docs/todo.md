@@ -197,6 +197,7 @@
 - [x] Implement event extraction from emails
 - [x] Create event scheduling capabilities
 - [x] Add meeting response handling
+- [x] Fix Calendar API authorization scopes
 
 ### Task Management
 - [ ] Implement task extraction from emails

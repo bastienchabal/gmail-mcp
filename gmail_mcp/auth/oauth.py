@@ -32,11 +32,25 @@ config = get_config()
 token_manager = TokenManager()
 
 # Define scopes
-SCOPES = [
+SCOPES = config.get("gmail_api_scopes", [
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/userinfo.email",
-    "https://www.googleapis.com/auth/userinfo.profile",
-]
+    "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/gmail.labels",
+    "https://www.googleapis.com/auth/gmail.modify",
+])
+
+# Add Calendar API scopes if enabled
+if config.get("calendar_api_enabled", False):
+    SCOPES.extend(config.get("calendar_api_scopes", [
+        "https://www.googleapis.com/auth/calendar.readonly",
+        "https://www.googleapis.com/auth/calendar.events",
+    ]))
+
+# Always include user info scopes
+if "https://www.googleapis.com/auth/userinfo.email" not in SCOPES:
+    SCOPES.append("https://www.googleapis.com/auth/userinfo.email")
+if "https://www.googleapis.com/auth/userinfo.profile" not in SCOPES:
+    SCOPES.append("https://www.googleapis.com/auth/userinfo.profile")
 
 
 def login() -> str:
