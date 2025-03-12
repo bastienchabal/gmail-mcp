@@ -11,7 +11,6 @@ import sys
 import traceback
 from typing import Dict, Any, List, Optional
 
-from dotenv import load_dotenv
 from mcp.server.fastmcp import FastMCP
 
 from gmail_mcp.utils.logger import get_logger
@@ -20,9 +19,6 @@ from gmail_mcp.auth.token_manager import TokenManager
 from gmail_mcp.mcp.tools import setup_tools
 from gmail_mcp.mcp.resources import setup_resources
 from gmail_mcp.mcp.prompts import setup_prompts
-
-# Load environment variables
-load_dotenv()
 
 # Get logger
 logger = get_logger(__name__)

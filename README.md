@@ -1,6 +1,6 @@
 # Gmail MCP Server
 
-A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop, enabling intelligent, context-aware interactions with your email.
+A Model Context Protocol (MCP) server for Gmail & Calendar integration with Claude Desktop, enabling intelligent, context-aware interactions with your email.
 
 ## Features
 
@@ -33,24 +33,34 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
    ```
 
+3. Install dependencies:
+   ```bash
+   uv pip install -e .
+   ```
+
 ## Configuration
 
 ### Step 1: Authenticate with Google
 
 1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
 2. Create a new project or select an existing one
-2. Enable Google APIs :
+3. Enable Google APIs:
    - [Enable the Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
    - [Enable the Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
-3. Configure the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent):
+4. Configure the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent):
    - Select "External" user type
    - Add your email as a test user
    - Add all the [scopes](https://console.cloud.google.com/auth/scopes) of Gmail and Calendar
-4. Create [OAuth 2.0 credentials](https://console.cloud.google.com/apis/credentials):
+5. Create [OAuth 2.0 credentials](https://console.cloud.google.com/apis/credentials):
    - Choose "Desktop app" as the application type
    - Download the JSON credentials file
    - Copy the Client ID and Client Secret
-7. Replace every values between < > in `claude_desktop_config.json` file in `/Users/<username>/Library/Application Support/Claude`
+
+### Step 2: Configure Claude Desktop
+
+1. Create or edit the `claude_desktop_config.json` file in `/Users/<username>/Library/Application Support/Claude`
+2. Add the following configuration, replacing the placeholders with your actual values:
+
 ```json
 {
   "mcpServers": {
@@ -63,27 +73,22 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
       "cwd": "/<absolute-path>/gmail-mcp",
       "env": {
         "PYTHONPATH": "/<absolute-path>/gmail-mcp",
-        "MCP_SERVER_NAME": "Gmail MCP",
-        "MCP_SERVER_DESCRIPTION": "A Model Context Protocol server for Gmail integration with Claude Desktop",
-        "HOST": "localhost",
-        "PORT": "8000",
-        "DEBUG": "true",
-        "LOG_LEVEL": "INFO",
+        "CONFIG_FILE_PATH": "/<absolute-path>/gmail-mcp/config.yaml",
         "GOOGLE_CLIENT_ID": "<your-client-id>",
         "GOOGLE_CLIENT_SECRET": "<your-client-secret>",
-        "GOOGLE_REDIRECT_URI": "http://localhost:8000/auth/callback",
-        "GOOGLE_AUTH_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/userinfo.profile,openid",
-        "GMAIL_API_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify",
-        "TOKEN_STORAGE_PATH": "/<absolute-path>/gmail-mcp/tokens.json",
-        "TOKEN_ENCRYPTION_KEY": "45b9a6655b42fb9e41a8671e8edd2c2345c0eb42cb334d30a2f403b61cb7d0e8",
-        "MCP_VERSION": "2025-03-07",
-        "CALENDAR_API_ENABLED": "true",
-        "CALENDAR_API_SCOPES": "https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events"
+        "TOKEN_ENCRYPTION_KEY": "<generate-a-random-key>"
       }
     }
   }
 }
 ```
+
+Notes:
+- Replace `<absolute-path>` with the actual path to your gmail-mcp directory
+- Replace `<your-client-id>` and `<your-client-secret>` with your Google OAuth credentials
+- Generate a random encryption key with: `python -c "import os; from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
+
+The configuration is designed to keep sensitive data (client ID, client secret, and encryption key) in the Claude Desktop configuration file, while non-sensitive settings are stored in the config.yaml file included in the repository.
 
 ### Important Note on Calendar Integration
 
@@ -103,7 +108,7 @@ This script will automatically delete your existing tokens and guide you through
 
 This ensures that your OAuth token includes all the necessary scopes for both Gmail and Calendar operations.
 
-### Step 2: Use Claude Desktop
+### Step 3: Use Claude Desktop
 
 With the MCP server running:
 1. Open Claude Desktop

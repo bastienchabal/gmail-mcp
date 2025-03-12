@@ -7,12 +7,28 @@ This module provides functions for setting up and configuring the application lo
 import os
 import logging
 import sys
+import yaml
+from pathlib import Path
 from typing import Optional
 
-from dotenv import load_dotenv
 
-# Ensure environment variables are loaded
-load_dotenv()
+def get_log_level() -> str:
+    """
+    Get the log level from config.yaml.
+    
+    Returns:
+        str: The log level (INFO by default).
+    """
+    try:
+        config_path = Path(os.getenv("CONFIG_FILE_PATH", "config.yaml"))
+        if config_path.exists():
+            with open(config_path, "r") as f:
+                config = yaml.safe_load(f) or {}
+                server_config = config.get("server", {})
+                return server_config.get("log_level", "INFO")
+        return "INFO"
+    except Exception:
+        return "INFO"
 
 
 def setup_logger(name: Optional[str] = None) -> logging.Logger:
@@ -28,8 +44,8 @@ def setup_logger(name: Optional[str] = None) -> logging.Logger:
     # Get the logger
     logger = logging.getLogger(name or "gmail_mcp")
     
-    # Set the log level from environment variable or default to INFO
-    log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+    # Set the log level from config or default to INFO
+    log_level_str = get_log_level().upper()
     log_level = getattr(logging, log_level_str, logging.INFO)
     logger.setLevel(log_level)
     
