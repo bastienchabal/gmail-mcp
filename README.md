@@ -126,7 +126,7 @@ If Claude Desktop doesn't connect automatically (i.e. you do not see the tool ic
 
 Calendar integration can be turned off in the configuration file. If you've previously authenticated with the Gmail MCP server and are now enabling Calendar integration, you'll need to re-authenticate to grant the additional Calendar API scopes. You can do this by:
 
-1. Deleting the existing tokens.json file (if present)
+1. Deleting the existing tokens.json file (if present, either at projet root or in  ~/Users/`<username/>`gmail_mcp_tokens/tokens.json)
 2. Restarting the MCP server
 3. Following the authentication process again
 
@@ -179,7 +179,7 @@ The MCP includes several guides to help you get the most out of its capabilities
 - **Reply Guide**: Best practices for context-aware email replies
 - **Debug Guide**: Troubleshooting common issues
 
-☑️ This MCP is configured so Claude will always asks you for confirmation before doing any important action, such as sending an email or creating a meeting.
+☑️ This MCP is configured so Claude will always ask you for confirmation before doing any important action, such as sending an email or creating a meeting.
 
 ## ⚠ Beta Notice 
 

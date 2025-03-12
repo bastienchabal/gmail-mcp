@@ -148,6 +148,7 @@
 - [x] Add authentication debugging capabilities and improve reliability
 - [x] Enhance auth status resource with detailed information and next steps
 - [x] Fix OAuth callback processing and improve authentication user experience
+- [x] Fix token storage to handle read-only file systems by using user's home directory
 
 ### Base MCP Server
 - [x] Create basic server with MCP tools and resources

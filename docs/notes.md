@@ -1,5 +1,21 @@
 # Gmail MCP Server Implementation Notes
 
+## Token Storage Fix (2024-03-12)
+
+Fixed an issue with token storage when running in Claude Desktop:
+
+- Implemented a multi-location token storage strategy:
+  1. First tries to write to the project directory (./tokens.json)
+  2. If that fails, tries the configured token path
+  3. As a last resort, falls back to the user's home directory
+- Added path expansion for home directory paths
+- Enhanced error handling for token storage failures
+- Updated token retrieval to check all possible locations in order of preference
+- Modified token existence check to look in all locations
+- Improved token clearing to remove tokens from all locations
+
+This approach keeps tokens in the project directory when possible (for clarity and ease of management), but gracefully falls back to the user's home directory when running in environments with read-only file systems like Claude Desktop.
+
 ## Project Setup (2023-05-15)
 
 The project has been set up with the following structure:
