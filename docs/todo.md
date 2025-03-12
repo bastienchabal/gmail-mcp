@@ -34,6 +34,7 @@
 - [x] Add authentication status resource
 - [x] Create authentication tools
 - [x] Add authentication prompts
+- [x] Fix OAuth scope issues with openid scope
 - [ ] Implement guided authentication flow
 - [ ] Add token expiration handling
 - [ ] Improve error handling for authentication failures
@@ -146,6 +147,7 @@
 - [x] Implement timeout mechanism and fix infinite loading issues in authentication
 - [x] Add authentication debugging capabilities and improve reliability
 - [x] Enhance auth status resource with detailed information and next steps
+- [x] Fix OAuth callback processing and improve authentication user experience
 
 ### Base MCP Server
 - [x] Create basic server with MCP tools and resources
@@ -198,6 +200,7 @@
 - [x] Create event scheduling capabilities
 - [x] Add meeting response handling
 - [x] Fix Calendar API authorization scopes
+- [x] Enhance calendar tools to require asking for missing event information
 
 ### Task Management
 - [ ] Implement task extraction from emails

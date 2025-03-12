@@ -45,15 +45,7 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
 3. Configure the [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent):
    - Select "External" user type
    - Add your email as a test user
-   - Add the scopes: 
-     - `https://www.googleapis.com/auth/gmail.readonly`
-     - `https://www.googleapis.com/auth/gmail.send`
-     - `https://www.googleapis.com/auth/gmail.labels`
-     - `https://www.googleapis.com/auth/gmail.modify`
-     - `https://www.googleapis.com/auth/calendar.readonly`
-     - `https://www.googleapis.com/auth/calendar.events`
-     - `https://www.googleapis.com/auth/userinfo.email`
-     - `https://www.googleapis.com/auth/userinfo.profile`
+   - Add all the [scopes](https://console.cloud.google.com/auth/scopes) of Gmail and Calendar
 4. Create [OAuth 2.0 credentials](https://console.cloud.google.com/apis/credentials):
    - Choose "Desktop app" as the application type
    - Download the JSON credentials file
@@ -80,7 +72,7 @@ A Model Context Protocol (MCP) server for Gmail integration with Claude Desktop,
         "GOOGLE_CLIENT_ID": "<your-client-id>",
         "GOOGLE_CLIENT_SECRET": "<your-client-secret>",
         "GOOGLE_REDIRECT_URI": "http://localhost:8000/auth/callback",
-        "GOOGLE_AUTH_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/userinfo.profile",
+        "GOOGLE_AUTH_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify,https://www.googleapis.com/auth/calendar.readonly,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/userinfo.email,https://www.googleapis.com/auth/userinfo.profile,openid",
         "GMAIL_API_SCOPES": "https://www.googleapis.com/auth/gmail.readonly,https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/gmail.labels,https://www.googleapis.com/auth/gmail.modify",
         "TOKEN_STORAGE_PATH": "/<absolute-path>/gmail-mcp/tokens.json",
         "TOKEN_ENCRYPTION_KEY": "45b9a6655b42fb9e41a8671e8edd2c2345c0eb42cb334d30a2f403b61cb7d0e8",
@@ -121,18 +113,58 @@ With the MCP server running:
 If Claude Desktop doesn't connect automatically (i.e. you do not see the tool icon underneath the prompt input), you can try:
 - Restarting Claude Desktop
 - Asking Claude to "Use the Gmail MCP server"
-- Login to Gmail manually using : 
-```bash
-python -c "from gmail_mcp.auth.oauth import start_oauth_process; print(start_oauth_process(timeout=60))"
-```
+- Login to Gmail manually using one of these methods:
+
+#### Authentication Methods
+
+1. **Using the Authentication Test Script (Recommended)**:
+   ```bash
+   python debug/auth_test.py
+   ```
+   This script will:
+   - Check your configuration
+   - Open a browser window for authentication
+   - Handle the OAuth callback automatically
+   - Provide clear feedback on the process
+   - Create the tokens.json file when successful
+
+2. **Using the Re-authentication Script (for Calendar API)**:
+   ```bash
+   python debug/reauth_calendar.py
+   ```
+   Use this if you need to re-authenticate to include Calendar API scopes.
+
+3. **Using the Simple Authentication Command**:
+   ```bash
+   python -c "from gmail_mcp.auth.oauth import start_oauth_process; print(start_oauth_process(timeout=60))"
+   ```
+
+#### Authentication Process
+
+When you run any of the authentication methods:
+
+1. A browser window will open to the Google login page
+2. Log in with your Google account
+3. Grant the requested permissions to the Gmail MCP application
+4. You will be redirected to a local callback page (http://localhost:8000/auth/callback)
+5. The callback page will process the authorization and create the tokens.json file
+6. The browser window will show a success message and close automatically
+7. You can now return to Claude Desktop and continue using the Gmail MCP
+
+If you see the redirect page but nothing happens (no success message), it means the callback server isn't running properly. Try using the `debug/auth_test.py` script instead, which provides better error handling and feedback.
 
 ## Troubleshooting
 
 If you encounter issues:
 
 1. **Authentication Problems**:
-   - Run `python debug/simple_auth.py` again to re-authenticate
+   - Run `python debug/auth_test.py` to test the authentication process with detailed feedback
    - Check that the token file exists at the project root
+   - Verify that your Google Cloud Console project has the correct redirect URI configured
+   - Make sure all required scopes are added to your OAuth consent screen
+   - If you see "Scope has changed" errors, ensure that the `openid` scope is included in your OAuth consent screen
+   - If you see "redirect_uri_mismatch" errors, add the exact URI shown in the error message to your authorized redirect URIs in Google Cloud Console
+   - If the callback page doesn't load or process properly, check if port 8000 is already in use by another application
 
 2. **Connection Issues**:
    - Make sure the MCP server is running (`python run_gmail_mcp.py`)

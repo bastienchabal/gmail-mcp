@@ -51,6 +51,9 @@ if "https://www.googleapis.com/auth/userinfo.email" not in SCOPES:
     SCOPES.append("https://www.googleapis.com/auth/userinfo.email")
 if "https://www.googleapis.com/auth/userinfo.profile" not in SCOPES:
     SCOPES.append("https://www.googleapis.com/auth/userinfo.profile")
+# Always include openid scope
+if "openid" not in SCOPES:
+    SCOPES.append("openid")
 
 
 def login() -> str:
@@ -164,24 +167,23 @@ def start_oauth_process(timeout: int = 300) -> bool:
         logger.error(f"Failed to get authorization URL: {auth_url}")
         return False
     
-    # Open the authorization URL in the default browser
-    logger.info("Opening authorization URL in browser")
-    webbrowser.open(auth_url)
+    # Import the callback server module
+    from gmail_mcp.auth.callback_server import start_oauth_flow
     
-    # Wait for the user to complete the authentication
-    logger.info(f"Waiting for authentication to complete (timeout: {timeout} seconds)")
-    
-    # Check if tokens exist every 5 seconds
-    start_time = time.time()
-    while time.time() - start_time < timeout:
+    try:
+        # Start the OAuth flow with the callback server
+        start_oauth_flow(auth_url, process_auth_code, timeout=timeout)
+        
+        # Check if tokens exist
         if token_manager.tokens_exist():
             logger.info("Authentication completed successfully")
             return True
-        
-        time.sleep(5)
-    
-    logger.error(f"Authentication timed out after {timeout} seconds")
-    return False
+        else:
+            logger.error("Authentication failed: No tokens created")
+            return False
+    except Exception as e:
+        logger.error(f"Authentication failed: {e}")
+        return False
 
 
 def get_credentials() -> Optional[Credentials]:

@@ -64,9 +64,9 @@ Tools are functions that Claude can call to perform actions. Here's how to use t
 
 | Tool | Description | Example Usage |
 |------|-------------|---------------|
-| `create_calendar_event(summary, start_time, end_time, description, location, attendees, color_id)` | Create a new event in Google Calendar | `create_calendar_event(summary="Team Meeting", start_time="5pm next wednesday")` |
-| `detect_events_from_email(email_id)` | Detect potential calendar events from an email | `detect_events_from_email(email_id="18abc123def456")` |
-| `list_calendar_events(max_results, time_min, time_max, query)` | List events from the user's Google Calendar | `list_calendar_events(time_min="tomorrow", time_max="tomorrow at 11:59pm")` |
+| `create_calendar_event(summary, start_time, end_time, description, location, attendees, color_id)` | Create a new event in Google Calendar. Requires all details to be provided; will prompt for missing information. | `create_calendar_event(summary="Team Meeting", start_time="5pm next wednesday", end_time="6pm next wednesday", description="Weekly team sync", location="Conference Room A", attendees=["colleague@example.com"])` |
+| `detect_events_from_email(email_id)` | Detect potential calendar events from an email. Always ask for missing details before creating events. | `detect_events_from_email(email_id="18abc123def456")` |
+| `list_calendar_events(max_results, time_min, time_max, query)` | List events from the user's Google Calendar. Always include event links when discussing events. | `list_calendar_events(time_min="tomorrow", time_max="tomorrow at 11:59pm")` |
 
 ## Resources
 
@@ -204,6 +204,52 @@ Prompts are templated messages and workflows for users. Here's how to access the
    authenticate()
    ```
 
+### Creating Calendar Events
+
+1. Detect events from an email (optional):
+   ```
+   events = detect_events_from_email(email_id="18abc123def456")
+   ```
+
+2. Present the detected events to the user and ask for missing information:
+   ```
+   "I found a potential event in this email: Team Meeting on Wednesday at 3:00 PM.
+   
+   To add this to your calendar, I need some additional information:
+   1. When should the meeting end?
+   2. Where will the meeting take place?
+   3. Would you like to add a description?
+   4. Are there any attendees you'd like to invite?"
+   ```
+
+3. Collect all required information from the user:
+   ```
+   summary = "Team Meeting"
+   start_time = "Wednesday at 3:00 PM"
+   end_time = "Wednesday at 4:00 PM"  # User provided
+   location = "Conference Room A"      # User provided
+   description = "Weekly team sync"    # User provided
+   attendees = ["colleague@example.com"] # User provided
+   ```
+
+4. Create the event with all required information:
+   ```
+   event_result = create_calendar_event(
+       summary=summary,
+       start_time=start_time,
+       end_time=end_time,
+       location=location,
+       description=description,
+       attendees=attendees
+   )
+   ```
+
+5. Confirm the event creation and provide the link:
+   ```
+   "I've added the Team Meeting to your calendar for Wednesday from 3:00 PM to 4:00 PM at Conference Room A.
+   You can view and edit it here: " + event_result["event_link"]
+   ```
+
 ## Important Guidelines
 
 ### Email Links
@@ -245,12 +291,32 @@ When reading emails, Claude should proactively detect potential calendar events 
 
 1. Use `detect_events_from_email()` to identify potential events in emails
 2. Present the detected events to the user and ask for confirmation
-3. Only after receiving explicit confirmation, use `create_calendar_event()` to add the event
+3. Ask for any missing information (end time, location, description, attendees)
+4. Only after receiving all necessary information and explicit confirmation, use `create_calendar_event()` to add the event
+
+**IMPORTANT**: Never use default values for event details. Always ask the user for:
+- End time (if not specified)
+- Location (if not specified)
+- Description (if not specified)
+- Attendees (if not specified)
 
 Example workflow:
 ```
 I noticed this email contains what appears to be a meeting invitation for tomorrow at 3:00 PM.
-Would you like me to add this to your calendar?
+
+Here are the details I detected:
+- Title: Project Review Meeting
+- Start time: Tomorrow at 3:00 PM
+- End time: Not specified
+- Location: Not specified
+- Description: Not specified
+- Attendees: Not specified
+
+Would you like me to add this to your calendar? If so, I'll need some additional information:
+1. How long will the meeting last?
+2. Where will the meeting take place?
+3. Would you like to add a description?
+4. Are there any attendees you'd like to invite?
 ```
 
 ### Email Confirmation

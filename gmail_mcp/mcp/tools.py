@@ -890,10 +890,10 @@ def setup_tools(mcp: FastMCP) -> None:
         Args:
             summary (str): The title/summary of the event
             start_time (str): The start time of the event in ISO format (YYYY-MM-DDTHH:MM:SS) or natural language ("5pm next wednesday")
-            end_time (str, optional): The end time of the event. If not provided, defaults to 1 hour after start time.
-            description (str, optional): Description or notes for the event
-            location (str, optional): Location of the event
-            attendees (List[str], optional): List of email addresses of attendees
+            end_time (str, optional): The end time of the event. If not provided, you should ask the user for this information.
+            description (str, optional): Description or notes for the event. If not provided, you should ask the user for this information.
+            location (str, optional): Location of the event. If not provided, you should ask the user for this information.
+            attendees (List[str], optional): List of email addresses of attendees. If not provided, you should ask the user if there are any attendees.
             color_id (str, optional): Color ID for the event (1-11)
             
         Returns:
@@ -902,6 +902,7 @@ def setup_tools(mcp: FastMCP) -> None:
                 - message: A message describing the result
                 - event_id: The ID of the created event
                 - event_link: Direct link to the event in Google Calendar
+                - missing_info: List of missing information that should be asked from the user
                 
         Example usage:
         1. Create a simple event:
@@ -918,11 +919,38 @@ def setup_tools(mcp: FastMCP) -> None:
            )
            
         3. Always include the event_link in your response to the user
+        
+        Important:
+        - When information is missing, ask the user for the specific details before creating the event
+        - Never use default values for end_time, location, or description without user input
+        - Always confirm all details with the user before creating the event
         """
         credentials = get_credentials()
         
         if not credentials:
             return {"error": "Not authenticated. Please use the authenticate tool first."}
+        
+        # Check for missing information that should be asked from the user
+        missing_info = []
+        if not end_time:
+            missing_info.append("end_time")
+        if not description:
+            missing_info.append("description")
+        if not location:
+            missing_info.append("location")
+        if not attendees:
+            missing_info.append("attendees")
+        
+        # If there's missing information, return early with a list of what's missing
+        if missing_info:
+            return {
+                "success": False,
+                "needs_more_info": True,
+                "missing_info": missing_info,
+                "summary": summary,
+                "start_time": start_time,
+                "message": "Please ask the user for more information before creating the event."
+            }
         
         try:
             # Build the Calendar API service
@@ -939,16 +967,23 @@ def setup_tools(mcp: FastMCP) -> None:
                 # If that fails, try natural language parsing
                 start_datetime = parser.parse(start_time)
             
-            # If end_time is not provided, default to 1 hour after start_time
-            if not end_time:
-                end_datetime = start_datetime + timedelta(hours=1)
-            else:
-                try:
-                    # Try to parse as ISO format first
+            # Parse end_time (we know it's provided at this point)
+            try:
+                # Try to parse as ISO format first
+                if end_time and 'Z' in end_time:
                     end_datetime = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-                except ValueError:
-                    # If that fails, try natural language parsing
+                elif end_time:
+                    end_datetime = datetime.fromisoformat(end_time)
+                else:
+                    # This shouldn't happen due to our earlier check, but just in case
+                    end_datetime = start_datetime + timedelta(hours=1)
+            except ValueError:
+                # If that fails, try natural language parsing
+                if end_time:
                     end_datetime = parser.parse(end_time)
+                else:
+                    # This shouldn't happen due to our earlier check, but just in case
+                    end_datetime = start_datetime + timedelta(hours=1)
             
             # Format for Google Calendar API
             start_time_formatted = start_datetime.isoformat()
@@ -994,7 +1029,10 @@ def setup_tools(mcp: FastMCP) -> None:
                 "event_link": event_link,
                 "summary": summary,
                 "start_time": start_time_formatted,
-                "end_time": end_time_formatted
+                "end_time": end_time_formatted,
+                "location": location,
+                "description": description,
+                "attendees": attendees
             }
         
         except Exception as e:
@@ -1029,9 +1067,14 @@ def setup_tools(mcp: FastMCP) -> None:
         1. Get an email: email = get_email(email_id="...")
         2. Detect events: events = detect_events_from_email(email_id="...")
         3. Ask the user if they want to add the events to their calendar
-        4. If confirmed, create the events using create_calendar_event()
+        4. Ask the user for any missing information (end time, location, description, attendees)
+        5. If confirmed, create the events using create_calendar_event()
         
-        Note: Always ask for user confirmation before creating calendar events.
+        Important:
+        - Always ask for user confirmation before creating calendar events
+        - Always ask for missing information like end time, location, description, and attendees
+        - Never use default values without user input
+        - Always include the event_link when discussing events with the user
         """
         credentials = get_credentials()
         
@@ -1186,7 +1229,10 @@ def setup_tools(mcp: FastMCP) -> None:
         3. Search for specific events:
            list_calendar_events(query="meeting")
            
-        4. Always include the event_link when discussing specific events with the user
+        Important:
+        - Always include the event_link when discussing specific events with the user
+        - The event_link allows users to directly access their events in Google Calendar
+        - When listing multiple events, include the event_link for each event
         """
         credentials = get_credentials()
         

@@ -761,3 +761,125 @@ To address authorization issues with the Calendar API integration, several impro
 4. **Improved User Experience**: Re-authentication script simplifies the process for users
 
 These changes ensure that the Calendar API integration works seamlessly with the proper authorization scopes, allowing Claude to create and manage calendar events as requested.
+
+## Authentication Process Improvements (2023-05-27)
+
+To address issues with the OAuth authentication process, several improvements have been made:
+
+### OAuth Callback Server Integration
+
+1. **Proper Callback Server Usage**: Updated the `start_oauth_process` function to use the existing callback server:
+   - Modified `oauth.py` to import and use the `start_oauth_flow` function from `callback_server.py`
+   - Ensured proper error handling and feedback during the authentication process
+   - Fixed the issue where the callback URL would redirect but not process the authorization code
+
+2. **Authentication Test Script**: Created a dedicated script for testing the authentication process:
+   - Added `debug/auth_test.py` with comprehensive configuration checking
+   - Implemented clear, user-friendly output with emoji indicators
+   - Added detailed feedback about the authentication process
+   - Provided absolute path information for the tokens file
+
+3. **Improved Documentation**: Enhanced the README with clearer authentication instructions:
+   - Added a dedicated "Authentication Methods" section
+   - Provided step-by-step explanation of the authentication process
+   - Included troubleshooting tips for common authentication issues
+   - Added guidance for handling redirect URI mismatch errors
+
+### Implementation Details
+
+1. **Callback Processing**: Fixed the issue where the callback URL would redirect but not process:
+   - Ensured the callback server is properly started before opening the browser
+   - Added proper error handling for the callback processing
+   - Implemented a more robust token existence check after authentication
+
+2. **User Guidance**: Improved user feedback during the authentication process:
+   - Added clear console output about the authentication steps
+   - Provided visual indicators of success or failure
+   - Included detailed error messages for troubleshooting
+
+3. **Error Handling**: Enhanced error handling throughout the authentication flow:
+   - Added try/except blocks around critical sections
+   - Provided more specific error messages
+   - Ensured resources are properly cleaned up even when errors occur
+
+### Benefits
+
+1. **Improved User Experience**: The authentication process is now more reliable and user-friendly
+2. **Better Troubleshooting**: Users have more information to diagnose and fix authentication issues
+3. **Clearer Documentation**: The README now provides comprehensive guidance on the authentication process
+4. **Robust Implementation**: The code is more resilient to errors and edge cases
+
+These changes ensure that the authentication process works reliably, even for users who are not familiar with OAuth or the technical details of the application.
+
+## OAuth Scope Update (2023-05-28)
+
+To address authentication issues related to scope changes, the "openid" scope has been added to the OAuth configuration:
+
+### Issue Identified
+
+Users were encountering the following error during authentication:
+```
+Authentication Failed
+Error: Failed to process authorization code: Scope has changed from "..." to "... openid ..."
+```
+
+This occurred because the Google OAuth library was automatically adding the "openid" scope, but it wasn't included in our original scope configuration.
+
+### Solution Implemented
+
+1. **Added "openid" Scope**: Updated the OAuth module to always include the "openid" scope:
+   - Modified `oauth.py` to add "openid" to the list of always-included scopes
+   - Updated the README to include "openid" in the list of required scopes
+   - Added troubleshooting information about scope change errors
+
+2. **Documentation Updates**:
+   - Added information about the "openid" scope to the OAuth consent screen configuration
+   - Updated the environment variables example to include the "openid" scope
+   - Added a troubleshooting entry for "Scope has changed" errors
+
+### Benefits
+
+1. **Improved Reliability**: Authentication now works consistently without scope mismatch errors
+2. **Better User Experience**: Users no longer need to manually add the "openid" scope
+3. **Clearer Documentation**: The README now explicitly mentions all required scopes
+
+This change ensures that the OAuth authentication process works smoothly without scope-related errors, providing a better experience for users setting up the Gmail MCP server.
+
+## Calendar Tools Enhancement (2023-05-29)
+
+To improve the user experience with Calendar integration, several enhancements have been made to the Calendar tools:
+
+### Issue Identified
+
+The original implementation of `create_calendar_event()` used default values for missing information:
+- If end_time was not provided, it defaulted to 1 hour after start_time
+- Location, description, and attendees were optional with no prompting for this information
+- This led to events being created with incomplete information
+
+### Solution Implemented
+
+1. **Modified `create_calendar_event()` Tool**:
+   - Updated to check for missing information (end_time, location, description, attendees)
+   - Returns a response with `needs_more_info: true` and a list of missing fields when information is incomplete
+   - Requires Claude to ask the user for all missing information before creating the event
+   - Only creates events when all necessary information is provided
+
+2. **Enhanced `detect_events_from_email()` Tool**:
+   - Updated documentation to emphasize the need to ask for missing information
+   - Added explicit instructions to never use default values without user input
+   - Improved the workflow to include asking for end time, location, description, and attendees
+
+3. **Updated Documentation**:
+   - Added comprehensive guidelines in `functions.md` for handling calendar events
+   - Created a detailed workflow example for creating calendar events
+   - Added explicit instructions to always ask for missing information
+   - Updated the Calendar Tools section to reflect the new requirements
+
+### Benefits
+
+1. **Improved User Control**: Users now have full control over all aspects of calendar events
+2. **More Complete Events**: Calendar events now contain all relevant information
+3. **Better User Experience**: Claude now asks for missing information in a natural, conversational way
+4. **Consistent Behavior**: All calendar-related tools now follow the same pattern of requiring complete information
+
+This enhancement ensures that Claude creates high-quality calendar events with all the information a user would typically want to include, rather than relying on default values that might not be appropriate for the specific event.
