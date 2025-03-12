@@ -37,27 +37,39 @@ def setup_prompts(mcp: FastMCP) -> None:
             "content": """
 # Gmail MCP Quick Start Guide
 
-Welcome to the Gmail MCP for Claude Desktop! This integration allows Claude to access and work with your Gmail account.
+Welcome to the Gmail MCP for Claude Desktop! This integration allows Claude to access and work with your Gmail account and Google Calendar, providing context-aware assistance for your email and scheduling needs.
 
 ## Getting Started
 
 1. **Authentication**: First, you need to authenticate with your Google account.
    - Check your authentication status with `check_auth_status()`
    - If not authenticated, use `authenticate()` to start the process
+   - After receiving the authorization code, use `process_auth_code_tool(code="your_code", state="your_state")`
 
-2. **Basic Email Operations**:
+2. **Email Operations**:
    - Get an overview of your inbox with `get_email_overview()`
    - List recent emails with `list_emails(max_results=10, label="INBOX")`
    - Search for specific emails with `search_emails(query="from:example@gmail.com")`
    - View a specific email with `get_email(email_id="...")`
 
-3. **Troubleshooting**:
+3. **Context-Aware Email Replies**:
+   - Prepare a context-rich reply with `prepare_email_reply(email_id="...")`
+   - Create a draft reply with `send_email_reply(email_id="...", reply_text="...", include_original=True)`
+   - After reviewing and confirming, send the email with `confirm_send_email(draft_id="...")`
+
+4. **Calendar Integration**:
+   - Create calendar events with `create_calendar_event(summary="...", start_time="...")`
+   - Detect events from emails with `detect_events_from_email(email_id="...")`
+   - List upcoming calendar events with `list_calendar_events(max_results=10)`
+
+5. **Troubleshooting**:
    - If you encounter any issues, check the debug help resource: `debug://help`
    - You can also check the server status with `server://status`
+   - For authentication issues, see the authentication guide: `gmail://authentication_guide`
 
-## Example Workflow
+## Example Workflows
 
-Here's a simple workflow to get started:
+### Email Workflow
 
 1. Check authentication status:
    ```
@@ -84,12 +96,76 @@ Here's a simple workflow to get started:
    get_email(email_id="18abc123def456")
    ```
 
+6. Prepare a context-aware reply:
+   ```
+   prepare_email_reply(email_id="18abc123def456")
+   ```
+
+7. Create a draft reply:
+   ```
+   send_email_reply(email_id="18abc123def456", reply_text="Thanks for your email. I'll review this and get back to you soon.")
+   ```
+
+8. After user confirmation, send the email:
+   ```
+   confirm_send_email(draft_id="draft_id_from_previous_step")
+   ```
+
+### Calendar Workflow
+
+1. List upcoming calendar events:
+   ```
+   list_calendar_events(max_results=5)
+   ```
+
+2. Create a new calendar event:
+   ```
+   create_calendar_event(
+       summary="Team Meeting",
+       start_time="tomorrow at 2pm",
+       end_time="tomorrow at 3pm",
+       description="Weekly team sync",
+       location="Conference Room A",
+       attendees=["colleague@example.com"]
+   )
+   ```
+
+3. Detect potential events from an email:
+   ```
+   detect_events_from_email(email_id="18abc123def456")
+   ```
+
+## Advanced Search Syntax
+
+When using `search_emails()`, you can leverage Gmail's powerful search syntax:
+
+- `from:example@gmail.com` - Emails from a specific sender
+- `to:example@gmail.com` - Emails to a specific recipient
+- `subject:meeting` - Emails with "meeting" in the subject
+- `has:attachment` - Emails with attachments
+- `is:unread` - Unread emails
+- `after:2023/01/01` - Emails after January 1, 2023
+
+For more search options, see the search guide: `gmail://search_guide`
+
+## Available Resources
+
+- `auth://status` - Authentication status
+- `gmail://status` - Gmail account status
+- `email://{email_id}` - Detailed context for a specific email
+- `thread://{thread_id}` - Context for an entire email thread
+- `sender://{sender_email}` - Context about a specific sender
+- `server://info` - Server information
+- `server://status` - Server status
+- `debug://help` - Debugging help
+
 ## Need Help?
 
 If you need more information, check the following resources:
-- `server://info` - General server information
-- `debug://help` - Troubleshooting guide
-- `gmail://status` - Current Gmail account status
+- `gmail://authentication_guide` - Guide to authentication
+- `gmail://search_guide` - Guide to Gmail's search syntax
+- `gmail://reply_guide` - Guide to context-aware email replies
+- `gmail://debug_guide` - Troubleshooting guide
             """
         }
     

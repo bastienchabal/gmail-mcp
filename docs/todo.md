@@ -90,11 +90,11 @@
 - [x] Create email access guide prompt
 - [x] Create search guide prompt
 - [x] Create debugging guide prompt
-- [ ] Add email composition guide prompt
+- [x] Add email composition guide prompt
 - [ ] Create attachment handling guide prompt
 - [ ] Add label management guide prompt
 - [ ] Create thread management guide prompt
-- [ ] Add advanced search guide prompt
+- [x] Add advanced search guide prompt
 
 ## Documentation
 
@@ -106,9 +106,9 @@
 - [x] Document MCP tools
 - [x] Document MCP prompts
 - [x] Add API documentation
-- [ ] Create user guide
+- [x] Create user guide
 - [ ] Add developer guide
-- [ ] Create troubleshooting guide
+- [x] Create troubleshooting guide
 
 ## Deployment
 
@@ -129,10 +129,10 @@
 - [x] Streamline workflows with "Quick Start" section
 - [x] Update documentation to reflect simplified approach
 - [x] Restructure project to centralize MCP components
-- [ ] Create example workflows
+- [x] Create example workflows
 - [ ] Implement guided authentication flow
-- [ ] Add more direct tools for common tasks
-- [ ] Create simplified prompts for common tasks
+- [x] Add more direct tools for common tasks
+- [x] Create simplified prompts for common tasks
 
 ## Core Infrastructure
 ### Authentication Module
@@ -240,14 +240,14 @@
 - [x] Streamline workflows
 - [x] Add email links for direct access to emails
 - [x] Implement confirmation workflow for sending emails
-- [ ] Create example workflows for common email tasks
+- [x] Create example workflows for common email tasks
 - [ ] Implement guided authentication flow for Claude Desktop
 - [ ] Add automatic resource fetching when Claude connects
 - [ ] Implement workflow state tracking between requests
-- [ ] Create specialized prompts for specific email tasks
+- [x] Create specialized prompts for specific email tasks
 - [ ] Implement automatic error recovery in tools
 - [ ] Add more debugging capabilities
-- [ ] Create combined operation tools
+- [x] Create combined operation tools
 
 ## Testing and Refinement
 - [ ] Write unit tests for core functionality

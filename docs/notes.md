@@ -883,3 +883,22 @@ The original implementation of `create_calendar_event()` used default values for
 4. **Consistent Behavior**: All calendar-related tools now follow the same pattern of requiring complete information
 
 This enhancement ensures that Claude creates high-quality calendar events with all the information a user would typically want to include, rather than relying on default values that might not be appropriate for the specific event.
+
+## Updated Quickstart Prompt and Documentation (2023-11-15)
+
+The quickstart prompt and documentation have been updated to reflect the current capabilities of the Gmail MCP:
+
+- Updated the quickstart prompt to include all current tools and resources
+- Added comprehensive examples for email and calendar workflows
+- Included information about context-aware email replies
+- Added details about calendar integration features
+- Updated the README.md usage section to highlight the MCP's capabilities:
+  - Context-aware email replies with communication pattern analysis
+  - Intelligent reply preparation with entity recognition
+  - Calendar integration with event detection from emails
+  - Advanced search capabilities
+  - Personalized drafting based on communication history
+- Marked completed tasks in the todo.md file
+- Added documentation for all available resources and guides
+
+These updates ensure that users and Claude have a clear understanding of the full capabilities of the Gmail MCP, particularly the context-aware features that go beyond basic email functionality.

@@ -132,27 +132,54 @@ Calendar integration can be turned off in the configuration file. If you've prev
 
 ## 👤 Usage
 
-The MCP server provides several tools that Claude can use:
+The Gmail MCP provides powerful, context-aware tools for managing your emails and calendar:
 
-### Email Tools
-- `get_email_count`: Get the count of emails in your inbox
-- `list_emails`: List emails from your mailbox
-- `get_email`: Get a specific email by ID
-- `search_emails`: Search for emails using Gmail's search syntax
+### Email Management
+- **Email Overview**: Get a comprehensive view of your inbox with counts and recent emails
+- **Advanced Search**: Use Gmail's powerful search syntax to find specific emails
+- **Detailed Email Analysis**: View emails with full context, including thread history and sender information
 
-### Calendar Tools
-- `create_calendar_event`: Create a new event in Google Calendar
-- `detect_events_from_email`: Detect potential calendar events from an email
-- `list_calendar_events`: List events from your Google Calendar
+### Context-Aware Email Replies
+- **Intelligent Reply Preparation**: Analyze the full context of an email thread before replying
+- **Communication Pattern Analysis**: Understand your communication history with the sender
+- **Personalized Drafting**: Create draft replies that match your communication style with specific contacts
+- **Entity Recognition**: Identify important dates, times, action items, and other entities in emails
+- **Related Email Context**: Consider other relevant emails when crafting replies
 
-You can ask Claude to use these tools by phrasing your requests naturally, such as:
-- "How many unread emails do I have?"
-- "Show me my recent emails"
-- "Find emails from John about the project"
-- "Get the details of my last email"
-- "Add a meeting with the team at 3pm tomorrow"
-- "Check if there are any events in this email"
-- "What's on my calendar for next week?"
+### Calendar Integration
+- **Event Creation**: Create calendar events with natural language time descriptions
+- **Event Detection**: Automatically detect potential events mentioned in emails
+- **Calendar Management**: View, search, and manage your upcoming calendar events
+- **Smart Scheduling**: Schedule meetings with appropriate context from email conversations
+
+### Example Requests
+You can ask Claude to use these capabilities with natural language requests like:
+- "Show me an overview of my inbox"
+- "Find all unread emails from my boss about the quarterly report"
+- "Help me reply to the last email from Sarah about the project deadline"
+- "Create a calendar event for the team meeting mentioned in John's email"
+- "What meetings do I have scheduled for next week?"
+- "Analyze this email thread and help me understand the key points before I reply"
+- "Draft a response to this email considering my previous communications with this person"
+
+### Available Resources
+The MCP provides rich contextual resources that Claude can access:
+- **Email Context**: Detailed information about specific emails
+- **Thread Context**: Full conversation history for email threads
+- **Sender Context**: Information about your relationship and communication history with senders
+- **Authentication Status**: Current authentication state with Google
+- **Gmail Status**: Overview of your Gmail account
+- **Server Information**: Details about the MCP server configuration
+
+### Available Guides
+The MCP includes several guides to help you get the most out of its capabilities:
+- **Quick Start Guide**: Basic instructions for getting started
+- **Authentication Guide**: Help with the authentication process
+- **Search Guide**: Advanced Gmail search syntax reference
+- **Reply Guide**: Best practices for context-aware email replies
+- **Debug Guide**: Troubleshooting common issues
+
+☑️ This MCP is configured so Claude will always asks you for confirmation before doing any important action, such as sending an email or creating a meeting.
 
 ## ⚠ Beta Notice 
 
@@ -162,7 +189,7 @@ This MCP is a WIP and is currently in beta.
 
 This project is licensed under the MIT License.
 
-## Acknowledgements
+## 💡 Acknowledgements
 
 - This project uses the Model Context Protocol (MCP) developed by Anthropic
 - Gmail API access is provided by Google's API services
