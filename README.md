@@ -1,6 +1,6 @@
 # Gmail MCP Server
 
-A Model Context Protocol (MCP) server for Gmail & Calendar integration with Claude Desktop, enabling intelligent, context-aware interactions with your email.
+A Model Context Protocol (MCP) server for Gmail & Google Calendar integration with Claude Desktop, enabling intelligent, context-aware interactions with your email.
 
 ## 🌟 Features
 
@@ -16,9 +16,9 @@ A Model Context Protocol (MCP) server for Gmail & Calendar integration with Clau
 ### Prerequisites
 
 - Python 3.10+
-- A Google Cloud Platform account with Gmail API enabled
-- OAuth 2.0 credentials for the Gmail API
-- Claude Desktop with MCP support
+- A Google Cloud Platform account with Gmail API and Google Calendar API (optional) enabled 
+- OAuth 2.0 credentials for the Gmail API and Google Calendar API (optional)
+- Claude Desktop with MCP support (currently only LLM interface to support MCP)
 
 ### Installation
 

@@ -1,116 +1,98 @@
 # Gmail MCP Project Structure
 
-## Overview
-
-The Gmail MCP project is organized into several modules, each with a specific responsibility:
+This document outlines the structure of the Gmail MCP project, showing the organization of files and directories with brief descriptions of their purpose.
 
 ```
 gmail-mcp/
-├── gmail_mcp/                  # Main package
-│   ├── __init__.py             # Package initialization
-│   ├── __main__.py             # Entry point for running as a module
-│   ├── main.py                 # FastMCP application setup
-│   ├── auth/                   # Authentication module
-│   │   ├── __init__.py
-│   │   └── oauth.py            # OAuth2 authentication
-│   ├── gmail/                  # Gmail API module
-│   │   └── processor.py        # Email processing functions
-│   ├── calendar/               # Calendar API module
-│   │   ├── __init__.py
-│   │   └── processor.py        # Calendar processing functions
-│   ├── mcp/                    # MCP module
-│   │   ├── resources.py        # Centralized MCP resources
-│   │   ├── tools.py            # Centralized MCP tools
-│   │   ├── prompts.py          # Centralized MCP prompts
-│   │   └── schemas.py          # Pydantic schemas for resources
-│   └── utils/                  # Utility module
-│       ├── config.py           # Configuration management
-│       └── logger.py           # Logging setup
-├── debug/                      # Debugging tools
-│   └── restart_server.sh       # Script to restart the server
-├── docs/                       # Documentation
-│   ├── functions.md            # MCP Functions details
-│   ├── structure.md            # Project structure documentation
-│   └── todo.md                 # Todo list
-├── .env                        # Environment variables
-├── .env.example                # Example environment variables
-├── .gitignore                  # Git ignore file
-├── LICENSE                     # License file
-└── README.md                   # Project README
+├── gmail_mcp/                     # Main package directory
+│   ├── auth/                      # Authentication-related modules
+│   │   ├── callback_server.py     # Server for handling OAuth callbacks
+│   │   ├── oauth.py               # OAuth2 authentication implementation
+│   │   └── token_manager.py       # Manages authentication tokens
+│   │
+│   ├── calendar/                  # Calendar-related modules
+│   │   └── processor.py           # Functions for processing calendar events
+│   │
+│   ├── gmail/                     # Gmail-related modules
+│   │   └── processor.py           # Functions for processing emails
+│   │
+│   ├── mcp/                       # MCP implementation modules
+│   │   ├── resources.py           # MCP resources implementation
+│   │   ├── prompts.py             # MCP prompts implementation
+│   │   ├── tools.py               # MCP tools implementation
+│   │   └── schemas.py             # Data schemas for MCP components
+│   │
+│   ├── utils/                     # Utility modules
+│   │   ├── config.py              # Configuration management
+│   │   └── logger.py              # Logging utilities
+│   │
+│   └── main.py                    # Main application entry point
+│
+├── docs/                          # Documentation
+│   ├── functions.md               # Documentation of functions
+│   ├── notes.md                   # Development notes
+│   ├── overview.md                # Overview of MCP components
+│   ├── structure.md               # This file - project structure
+│   └── todo.md                    # Task tracking
+│
+├── project/                       # Project management files
+│   ├── functions.md               # Function specifications
+│   ├── notes.md                   # Project notes and decisions
+│   ├── project.md                 # Project overview and goals
+│   ├── structure.md               # Project structure planning
+│   └── todo.md                    # Task list and progress
+│
+├── config.yaml                    # Application configuration
+├── pyproject.toml                 # Project dependencies and metadata
+├── pyrightconfig.json             # Pyright (type checking) configuration
+├── README.md                      # Project readme
+├── setup.cfg                      # Package setup configuration
+└── uv.lock                        # UV package manager lock file
 ```
-
-## Module Descriptions
-
-### Main Package (`gmail_mcp/`)
-
-- **`__init__.py`**: Package initialization.
-- **`__main__.py`**: Entry point for running the application as a module.
-- **`main.py`**: Sets up the FastAPI application and MCP server.
-
-### Authentication Module (`gmail_mcp/auth/`)
-
-- **`oauth.py`**: Implements OAuth2 authentication for the Gmail API.
-
-### Gmail Module (`gmail_mcp/gmail/`)
-
-- **`processor.py`**: Implements email processing functions for parsing, analyzing, and extracting information from emails.
-
-### Calendar Module (`gmail_mcp/calendar/`)
-
-- **`processor.py`**: Implements calendar processing functions for date/time parsing, event creation, and meeting time suggestions.
-
-### MCP Module (`gmail_mcp/mcp/`)
-
-- **`resources.py`**: Centralizes all MCP resources.
-- **`tools.py`**: Centralizes all MCP tools.
-- **`prompts.py`**: Centralizes all MCP prompts.
-- **`schemas.py`**: Defines Pydantic schemas used by resources.
-
-### Utils Module (`gmail_mcp/utils/`)
-
-- **`config.py`**: Manages configuration from environment variables.
-- **`logger.py`**: Sets up logging for the application.
-
-### Debug Tools (`debug/`)
-
-- **`restart_server.sh`**: Script to restart the server.
-
-### Documentation (`docs/`)
-
-- **`notes.md`**: Development notes and decisions.
-- **`structure.md`**: Documentation of the project structure.
-- **`todo.md`**: Todo list for the project.
 
 ## Key Components
 
-### MCP Resources
+### Authentication (auth/)
 
-All MCP resources are now centralized in `gmail_mcp/mcp/resources.py`. These include:
+The authentication module handles OAuth2 authentication with Google's APIs:
 
-- `auth://status`: Authentication status
-- `gmail://status`: Gmail account status
-- `email://{email_id}`: Email context
-- `thread://{thread_id}`: Thread context
-- `sender://{sender_email}`: Sender context
-- `server://info`: Server information
-- `server://config`: Server configuration
-- `server://status`: Server status
-- `debug://help`: Debugging help
-- `health://check`: Health check
+- **callback_server.py**: Implements a local web server to receive OAuth callbacks
+- **oauth.py**: Manages the OAuth2 flow with Google
+- **token_manager.py**: Handles token storage, retrieval, and refresh
 
-### MCP Tools
+### Gmail Processing (gmail/)
 
-All MCP tools are now centralized in `gmail_mcp/mcp/tools.py`. These include:
+- **processor.py**: Contains functions for parsing, analyzing, and processing emails, including thread analysis, entity extraction, and communication pattern analysis
 
-- Authentication tools: `login_tool()`, `authenticate()`, `process_auth_code_tool()`, `logout()`, `check_auth_status()`
-- Email tools: `get_email_count()`, `list_emails()`, `get_email()`, `search_emails()`, `get_email_overview()`, `prepare_email_reply()`, `send_email_reply()`, `confirm_send_email()`
-- Calendar tools: `create_calendar_event()`, `detect_events_from_email()`, `list_calendar_events()`, `suggest_meeting_times()`
+### Calendar Processing (calendar/)
 
-### MCP Prompts
+- **processor.py**: Provides utilities for calendar operations, including natural language date parsing, event creation, and meeting time suggestions
 
-All MCP prompts are now centralized in `gmail_mcp/mcp/prompts.py`. These include:
+### MCP Implementation (mcp/)
 
-- `gmail://quickstart`: Quick start guide
-- `gmail://search_guide`: Gmail search syntax guide
-- `gmail://authentication_guide`: Authentication guide
-- `gmail://debug_guide`: Debugging guide
+The core MCP implementation that exposes Gmail functionality to Claude:
+
+- **resources.py**: Defines MCP resources that provide context to Claude
+- **prompts.py**: Defines MCP prompts for user guidance
+- **tools.py**: Implements MCP tools that Claude can call
+- **schemas.py**: Defines data structures used throughout the MCP
+
+### Utilities (utils/)
+
+- **config.py**: Manages application configuration
+- **logger.py**: Provides logging functionality
+
+### Main Application
+
+- **main.py**: The entry point for the MCP server, sets up FastAPI and MCP components
+
+## Configuration Files
+
+- **config.yaml**: Contains application settings like API keys and server configuration
+- **pyproject.toml**: Defines project dependencies and build configuration
+- **setup.cfg**: Package setup configuration
+
+## Documentation
+
+- **docs/**: Contains user and developer documentation
+- **project/**: Contains project planning and management documents 
