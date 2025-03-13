@@ -202,6 +202,12 @@
 - [x] Add meeting response handling
 - [x] Fix Calendar API authorization scopes
 - [x] Enhance calendar tools to require asking for missing event information
+- [x] Create calendar processor module for improved date/time handling
+- [x] Implement natural language date/time parsing for calendar events
+- [x] Add suggest_meeting_times tool for finding available time slots
+- [x] Fix calendar event creation to automatically add user as attendee
+- [ ] Add recurring event support
+- [ ] Implement calendar notification management
 
 ### Task Management
 - [ ] Implement task extraction from emails

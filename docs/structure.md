@@ -14,7 +14,10 @@ gmail-mcp/
 │   │   ├── __init__.py
 │   │   └── oauth.py            # OAuth2 authentication
 │   ├── gmail/                  # Gmail API module
-│   │   └── processor.py        # Context building functions
+│   │   └── processor.py        # Email processing functions
+│   ├── calendar/               # Calendar API module
+│   │   ├── __init__.py
+│   │   └── processor.py        # Calendar processing functions
 │   ├── mcp/                    # MCP module
 │   │   ├── resources.py        # Centralized MCP resources
 │   │   ├── tools.py            # Centralized MCP tools
@@ -50,7 +53,11 @@ gmail-mcp/
 
 ### Gmail Module (`gmail_mcp/gmail/`)
 
-- This module is now a placeholder for potential future Gmail-specific functionality.
+- **`processor.py`**: Implements email processing functions for parsing, analyzing, and extracting information from emails.
+
+### Calendar Module (`gmail_mcp/calendar/`)
+
+- **`processor.py`**: Implements calendar processing functions for date/time parsing, event creation, and meeting time suggestions.
 
 ### MCP Module (`gmail_mcp/mcp/`)
 
@@ -97,7 +104,7 @@ All MCP tools are now centralized in `gmail_mcp/mcp/tools.py`. These include:
 
 - Authentication tools: `login_tool()`, `authenticate()`, `process_auth_code_tool()`, `logout()`, `check_auth_status()`
 - Email tools: `get_email_count()`, `list_emails()`, `get_email()`, `search_emails()`, `get_email_overview()`, `prepare_email_reply()`, `send_email_reply()`, `confirm_send_email()`
-- Calendar tools: `create_calendar_event()`, `detect_events_from_email()`, `list_calendar_events()`
+- Calendar tools: `create_calendar_event()`, `detect_events_from_email()`, `list_calendar_events()`, `suggest_meeting_times()`
 
 ### MCP Prompts
 

@@ -1,5 +1,59 @@
 # Gmail MCP Server Implementation Notes
 
+## Calendar Event Attendee Fix (2025-03-12)
+
+Fixed an issue where calendar events couldn't be created without specifying attendees:
+
+1. **Issue**: Claude was reporting an error when trying to create calendar events without attendees, stating that attendee information was required.
+
+2. **Root Cause**: The Google Calendar API requires at least one attendee for certain event types, but our implementation wasn't automatically adding the user as an attendee.
+
+3. **Fix**:
+   - Added a new `get_user_email()` function to retrieve the user's email address from their Gmail profile
+   - Modified the `create_calendar_event_object()` function to always add the user's email as an attendee
+   - Added logic to avoid duplicate attendees if the user's email was already in the attendee list
+
+4. **Improvement**: Users can now create personal calendar events without explicitly specifying attendees, as the system automatically adds them as an attendee.
+
+## Calendar Date Parsing Bug Fix (2025-03-12)
+
+Fixed a critical bug in the calendar date parsing logic that was causing events scheduled for "tomorrow" to be created for today's date instead:
+
+1. **Issue**: When users asked Claude to create an event for "tomorrow at 9am", the event was being created for today's date (March 12) instead of tomorrow (March 13).
+
+2. **Root Cause**: The date parsing logic in `parse_natural_language_datetime()` was only handling the exact string "tomorrow" but not variations like "tomorrow at 9am".
+
+3. **Fix**:
+   - Changed `elif datetime_str == "tomorrow":` to `elif "tomorrow" in datetime_str:`
+   - Added special handling for time components in the "tomorrow" case
+   - Added detailed debug logging to track the date calculations
+
+4. **Testing**: Created a test script (`debug/test_date_parsing.py`) to verify that all date formats are correctly parsed, especially "tomorrow at 9am".
+
+5. **Logging Improvements**: Set the default log level to DEBUG for better troubleshooting of date parsing issues.
+
+This fix ensures that when users ask Claude to create calendar events for "tomorrow", the events are correctly created for the next day, not the current day.
+
+## Calendar Processor Implementation (2024-03-12)
+
+Added a new `calendar/processor.py` module to improve date/time handling for calendar events. This module provides:
+
+1. **Natural Language Date/Time Parsing**: Robust parsing of various date/time formats including natural language expressions like "tomorrow at 9am" or "next monday 3-4pm".
+
+2. **Timezone Handling**: Proper timezone detection and handling to ensure events are created in the user's local timezone.
+
+3. **All-Day Event Detection**: Automatic detection of all-day events based on the start and end times.
+
+4. **Meeting Time Suggestions**: New functionality to suggest available meeting times based on the user's calendar.
+
+5. **Event Time Range Parsing**: Support for time ranges in a single string (e.g., "tomorrow 3-4pm").
+
+These improvements address issues where Claude would try to use natural language date strings directly with the Google Calendar API, causing errors or incorrect event creation. The new module ensures that all date/time inputs are properly parsed and formatted before being sent to the API.
+
+Also added a new `suggest_meeting_times` tool that allows Claude to find available time slots in the user's calendar for scheduling meetings.
+
+Updated the existing `list_calendar_events` tool to use the new processor for better date/time handling and improved display formatting.
+
 ## Token Storage Fix (2024-03-12)
 
 Fixed an issue with token storage when running in Claude Desktop:

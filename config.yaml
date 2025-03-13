@@ -30,5 +30,5 @@ calendar:
 
 # Token Storage
 tokens:
-  storage_path: ./tokens.json
+  storage_path: ~/gmail_mcp_tokens/tokens.json
   # encryption_key should be set in Claude Desktop config 

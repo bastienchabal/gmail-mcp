@@ -10,6 +10,7 @@ import json
 import logging
 import base64
 from typing import Dict, Any, List, Optional, Union
+from datetime import datetime, timedelta
 import httpx
 
 from mcp.server.fastmcp import FastMCP
@@ -28,6 +29,17 @@ from gmail_mcp.gmail.processor import (
     extract_entities,
     analyze_communication_patterns,
     find_related_emails
+)
+
+from gmail_mcp.calendar.processor import (
+    parse_natural_language_datetime,
+    parse_event_time,
+    get_user_timezone,
+    format_datetime_for_api,
+    detect_all_day_event,
+    extract_attendees_from_text,
+    extract_location_from_text,
+    create_calendar_event_object
 )
 
 # Get logger
@@ -956,64 +968,29 @@ def setup_tools(mcp: FastMCP) -> None:
             # Build the Calendar API service
             service = build("calendar", "v3", credentials=credentials)
             
-            # Parse natural language dates if needed
-            from dateutil import parser
-            from datetime import datetime, timedelta
+            # Use the calendar processor to create the event object with proper date/time handling
+            event_body = create_calendar_event_object(
+                summary=summary,
+                start_time=start_time,
+                end_time=end_time,
+                description=description,
+                location=location,
+                attendees=attendees,
+                color_id=color_id
+            )
             
-            try:
-                # Try to parse as ISO format first
-                start_datetime = datetime.fromisoformat(start_time.replace('Z', '+00:00'))
-            except ValueError:
-                # If that fails, try natural language parsing
-                start_datetime = parser.parse(start_time)
+            # Check if there was an error parsing the dates
+            if "error" in event_body:
+                return {
+                    "success": False,
+                    "error": event_body["error"],
+                    "parsed_start": event_body.get("parsed_start"),
+                    "parsed_end": event_body.get("parsed_end"),
+                    "message": "Could not parse the date/time information. Please provide a clearer date and time format."
+                }
             
-            # Parse end_time (we know it's provided at this point)
-            try:
-                # Try to parse as ISO format first
-                if end_time and 'Z' in end_time:
-                    end_datetime = datetime.fromisoformat(end_time.replace('Z', '+00:00'))
-                elif end_time:
-                    end_datetime = datetime.fromisoformat(end_time)
-                else:
-                    # This shouldn't happen due to our earlier check, but just in case
-                    end_datetime = start_datetime + timedelta(hours=1)
-            except ValueError:
-                # If that fails, try natural language parsing
-                if end_time:
-                    end_datetime = parser.parse(end_time)
-                else:
-                    # This shouldn't happen due to our earlier check, but just in case
-                    end_datetime = start_datetime + timedelta(hours=1)
-            
-            # Format for Google Calendar API
-            start_time_formatted = start_datetime.isoformat()
-            end_time_formatted = end_datetime.isoformat()
-            
-            # Create event body
-            event_body = {
-                'summary': summary,
-                'start': {
-                    'dateTime': start_time_formatted,
-                    'timeZone': 'UTC',  # Default to UTC
-                },
-                'end': {
-                    'dateTime': end_time_formatted,
-                    'timeZone': 'UTC',  # Default to UTC
-                },
-            }
-            
-            # Add optional fields if provided
-            if description:
-                event_body['description'] = description
-            
-            if location:
-                event_body['location'] = location
-            
-            if attendees:
-                event_body['attendees'] = [{'email': email} for email in attendees]
-            
-            if color_id:
-                event_body['colorId'] = color_id
+            # Remove the _parsed field before sending to the API
+            parsed_info = event_body.pop("_parsed", {})
             
             # Insert the event
             event = service.events().insert(calendarId='primary', body=event_body).execute()
@@ -1028,11 +1005,12 @@ def setup_tools(mcp: FastMCP) -> None:
                 "event_id": event_id,
                 "event_link": event_link,
                 "summary": summary,
-                "start_time": start_time_formatted,
-                "end_time": end_time_formatted,
+                "start_time": parsed_info.get("start_dt"),
+                "end_time": parsed_info.get("end_dt"),
                 "location": location,
                 "description": description,
-                "attendees": attendees
+                "attendees": attendees,
+                "all_day": parsed_info.get("all_day", False)
             }
         
         except Exception as e:
@@ -1243,20 +1221,18 @@ def setup_tools(mcp: FastMCP) -> None:
             # Build the Calendar API service
             service = build("calendar", "v3", credentials=credentials)
             
-            # Parse time parameters
-            from dateutil import parser
-            from datetime import datetime, timedelta
-            
+            # Parse time parameters using our calendar processor
             # Set default time_min to now if not provided
             if not time_min:
                 time_min_dt = datetime.utcnow()
             else:
-                try:
-                    # Try to parse as ISO format first
-                    time_min_dt = datetime.fromisoformat(time_min.replace('Z', '+00:00'))
-                except ValueError:
-                    # If that fails, try natural language parsing
-                    time_min_dt = parser.parse(time_min)
+                time_min_dt = parse_natural_language_datetime(time_min)
+                if not time_min_dt:
+                    return {
+                        "success": False,
+                        "error": f"Could not parse start time: {time_min}",
+                        "message": "Please provide a clearer date and time format for the start time."
+                    }
             
             # Format time_min for API
             time_min_formatted = time_min_dt.isoformat() + 'Z'  # 'Z' indicates UTC time
@@ -1264,15 +1240,19 @@ def setup_tools(mcp: FastMCP) -> None:
             # Parse time_max if provided
             time_max_formatted = None
             if time_max:
-                try:
-                    # Try to parse as ISO format first
-                    time_max_dt = datetime.fromisoformat(time_max.replace('Z', '+00:00'))
-                except ValueError:
-                    # If that fails, try natural language parsing
-                    time_max_dt = parser.parse(time_max)
+                time_max_dt = parse_natural_language_datetime(time_max)
+                if not time_max_dt:
+                    return {
+                        "success": False,
+                        "error": f"Could not parse end time: {time_max}",
+                        "message": "Please provide a clearer date and time format for the end time."
+                    }
                 
                 # Format time_max for API
                 time_max_formatted = time_max_dt.isoformat() + 'Z'  # 'Z' indicates UTC time
+            
+            # Get user's timezone
+            user_timezone = get_user_timezone()
             
             # Prepare parameters for the API call
             params = {
@@ -1280,7 +1260,8 @@ def setup_tools(mcp: FastMCP) -> None:
                 'timeMin': time_min_formatted,
                 'maxResults': max_results,
                 'singleEvents': True,
-                'orderBy': 'startTime'
+                'orderBy': 'startTime',
+                'timeZone': user_timezone
             }
             
             # Add optional parameters if provided
@@ -1301,6 +1282,29 @@ def setup_tools(mcp: FastMCP) -> None:
                 start = event.get('start', {})
                 end = event.get('end', {})
                 
+                # Determine if this is an all-day event
+                is_all_day = 'date' in start and 'date' in end
+                
+                # Format start and end times for display
+                if is_all_day:
+                    start_display = start.get('date', '')
+                    end_display = end.get('date', '')
+                    time_display = "All day"
+                else:
+                    # Parse the datetime strings
+                    start_dt = parse_natural_language_datetime(start.get('dateTime', ''))
+                    end_dt = parse_natural_language_datetime(end.get('dateTime', ''))
+                    
+                    # Format for display
+                    if start_dt and end_dt:
+                        start_display = start_dt.strftime("%Y-%m-%d %I:%M %p")
+                        end_display = end_dt.strftime("%I:%M %p") if start_dt.date() == end_dt.date() else end_dt.strftime("%Y-%m-%d %I:%M %p")
+                        time_display = f"{start_dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
+                    else:
+                        start_display = start.get('dateTime', '')
+                        end_display = end.get('dateTime', '')
+                        time_display = "Unknown time"
+                
                 # Generate event link
                 event_id = event['id']
                 event_link = f"https://calendar.google.com/calendar/event?eid={event_id}"
@@ -1311,6 +1315,10 @@ def setup_tools(mcp: FastMCP) -> None:
                     "summary": event.get('summary', 'Untitled Event'),
                     "start": start,
                     "end": end,
+                    "start_display": start_display,
+                    "end_display": end_display,
+                    "time_display": time_display,
+                    "is_all_day": is_all_day,
                     "location": event.get('location', ''),
                     "description": event.get('description', ''),
                     "attendees": event.get('attendees', []),
@@ -1320,7 +1328,13 @@ def setup_tools(mcp: FastMCP) -> None:
             return {
                 "success": True,
                 "events": processed_events,
-                "next_page_token": events_result.get('nextPageToken')
+                "next_page_token": events_result.get('nextPageToken'),
+                "timezone": user_timezone,
+                "query_parameters": {
+                    "time_min": time_min,
+                    "time_max": time_max,
+                    "query": query
+                }
             }
         
         except Exception as e:
@@ -1328,4 +1342,108 @@ def setup_tools(mcp: FastMCP) -> None:
             return {
                 "success": False,
                 "error": f"Failed to list calendar events: {e}"
+            }
+    
+    @mcp.tool()
+    def suggest_meeting_times(start_date: str, end_date: str, duration_minutes: int = 60, working_hours: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Suggest available meeting times within a date range.
+        
+        This tool analyzes the user's calendar and suggests available time slots
+        for scheduling meetings based on their existing calendar events.
+        
+        Prerequisites:
+        - The user must be authenticated with Google Calendar access
+        
+        Args:
+            start_date (str): The start date of the range to check (can be natural language like "tomorrow")
+            end_date (str): The end date of the range to check (can be natural language like "next friday")
+            duration_minutes (int, optional): The desired meeting duration in minutes. Defaults to 60.
+            working_hours (str, optional): Working hours in format "9-17" (9am to 5pm). Defaults to 9am-5pm.
+            
+        Returns:
+            Dict[str, Any]: The suggested meeting times including:
+                - success: Whether the operation was successful
+                - suggestions: List of suggested meeting times with formatted date/time
+                - message: A message describing the result
+                
+        Example usage:
+        1. Find meeting times for tomorrow:
+           suggest_meeting_times(start_date="tomorrow", end_date="tomorrow")
+           
+        2. Find meeting times for next week with custom duration:
+           suggest_meeting_times(
+               start_date="next monday", 
+               end_date="next friday", 
+               duration_minutes=30
+           )
+           
+        3. Find meeting times with custom working hours:
+           suggest_meeting_times(
+               start_date="tomorrow", 
+               end_date="friday", 
+               working_hours="10-16"
+           )
+           
+        Important:
+        - The tool respects the user's existing calendar events
+        - Suggestions are limited to working hours (default 9am-5pm)
+        - Weekends are excluded by default
+        - The tool will return at most 10 suggestions
+        """
+        credentials = get_credentials()
+        
+        if not credentials:
+            return {"error": "Not authenticated. Please use the authenticate tool first."}
+        
+        try:
+            # Parse working hours if provided
+            work_start_hour = 9  # Default 9am
+            work_end_hour = 17   # Default 5pm
+            
+            if working_hours:
+                try:
+                    hours_parts = working_hours.split("-")
+                    if len(hours_parts) == 2:
+                        work_start_hour = int(hours_parts[0])
+                        work_end_hour = int(hours_parts[1])
+                except Exception as e:
+                    logger.warning(f"Failed to parse working hours: {e}")
+            
+            # Use the calendar processor to suggest meeting times
+            from gmail_mcp.calendar.processor import suggest_meeting_times as processor_suggest_times
+            
+            suggestions = processor_suggest_times(
+                start_date=start_date,
+                end_date=end_date,
+                duration_minutes=duration_minutes,
+                working_hours=(work_start_hour, work_end_hour)
+            )
+            
+            # Check if there was an error
+            if suggestions and "error" in suggestions[0]:
+                return {
+                    "success": False,
+                    "error": suggestions[0]["error"],
+                    "message": "Could not suggest meeting times. Please check your date range."
+                }
+            
+            # Format the response
+            return {
+                "success": True,
+                "suggestions": suggestions,
+                "message": f"Found {len(suggestions)} available time slots.",
+                "parameters": {
+                    "start_date": start_date,
+                    "end_date": end_date,
+                    "duration_minutes": duration_minutes,
+                    "working_hours": f"{work_start_hour}-{work_end_hour}"
+                }
+            }
+        
+        except Exception as e:
+            logger.error(f"Failed to suggest meeting times: {e}")
+            return {
+                "success": False,
+                "error": f"Failed to suggest meeting times: {e}"
             } 
