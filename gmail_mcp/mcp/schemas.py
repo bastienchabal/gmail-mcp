@@ -162,4 +162,28 @@ class EmailReplyContext(BaseModel):
     sender_context: Optional[Dict[str, Any]] = None
     communication_patterns: Optional[Dict[str, Any]] = None
     entities: Optional[Dict[str, List[str]]] = None
-    related_emails: Optional[List[Dict[str, Any]]] = None 
+    related_emails: Optional[List[Dict[str, Any]]] = None
+
+
+class CalendarEventSchema(BaseModel):
+    """
+    Schema for calendar event information.
+    
+    This schema defines the structure of calendar event information
+    that is used for creating and managing events.
+    """
+    summary: str
+    start_datetime: datetime
+    end_datetime: datetime
+    description: Optional[str] = None
+    location: Optional[str] = None
+    attendees: List[str] = []
+    color_id: Optional[str] = None
+    timezone: str = "UTC"
+    all_day: bool = False
+    
+    class Config:
+        """Configuration for the CalendarEventSchema."""
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        } 

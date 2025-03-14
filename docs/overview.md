@@ -21,7 +21,7 @@ Tools are functions that Claude can call to perform actions.
 | `prepare_email_reply` | Prepares context for reply | `email_id`: str | Gather context before replying |
 | `send_email_reply` | Creates a draft reply | `email_id`: str, `reply_text`: str, `include_original`: bool | Draft a reply to an email |
 | `confirm_send_email` | Sends a draft email | `draft_id`: str | Send a previously created draft |
-| `create_calendar_event` | Creates a calendar event | `summary`: str, `start_time`: str, `end_time`: str, etc. | Schedule a new event |
+| `create_calendar_event` | Creates a calendar event | `summary`: str, `start_time`: str, `end_time`: str, `description`: str, `location`: str, `attendees`: List[str], `color_id`: str (color name or ID 1-11) | Schedule a new event |
 | `detect_events_from_email` | Detects events in email | `email_id`: str | Extract event details from email |
 | `list_calendar_events` | Lists calendar events | `max_results`: int, `time_min`: str, etc. | View upcoming events |
 | `suggest_meeting_times` | Suggests available times | `start_date`: str, `end_date`: str, etc. | Find free slots for meetings |
@@ -77,18 +77,35 @@ The calendar processor module provides utility functions for handling calendar e
 
 | Function | Description | Parameters | Return Value |
 |----------|-------------|------------|--------------|
-| `parse_natural_language_datetime` | Parses natural language date/time | `datetime_str`: str | datetime object or None |
-| `parse_event_time` | Parses event time string | `time_str`: str | Tuple of start and end datetimes |
 | `get_user_timezone` | Gets user's timezone | None | Timezone string |
-| `format_datetime_for_api` | Formats datetime for Calendar API | `dt`: datetime | Dict for API |
-| `detect_all_day_event` | Detects if event is all-day | `start_dt`: datetime, `end_dt`: datetime | Boolean |
-| `extract_attendees_from_text` | Extracts attendee emails from text | `text`: str | List of email addresses |
-| `extract_location_from_text` | Extracts location from text | `text`: str | Location string or None |
-| `get_user_email` | Gets user's email address | None | Email string |
 | `create_calendar_event_object` | Creates calendar event object | Various parameters | Dict for Calendar API |
-| `get_available_calendar_colors` | Gets available calendar colors | None | Dict of color information |
+| `get_color_id_from_name` | Converts color name to color ID | `color_name`: str | Color ID string or None |
 | `get_free_busy_info` | Gets free/busy information | `start_time`, `end_time` | Dict of free/busy info |
 | `suggest_meeting_times` | Suggests available meeting times | Various parameters | List of suggested times |
+
+## Calendar Color Mapping
+
+Google Calendar uses color IDs 1-11 for event colors. The MCP provides a mapping between color names and IDs:
+
+| Color Name | Color ID | Alternative Names |
+|------------|----------|-------------------|
+| blue | 1 | light blue |
+| green | 2 | light green |
+| purple | 3 | lavender |
+| red | 4 | salmon |
+| yellow | 5 | pale yellow |
+| orange | 6 | peach |
+| turquoise | 7 | cyan |
+| gray | 8 | light gray |
+| bold blue | 9 | dark blue |
+| bold green | 10 | dark green |
+| bold red | 11 | dark red |
+
+When creating calendar events, you can specify either:
+- A color name (e.g., "red", "blue", "purple") which will be converted to its corresponding ID
+- A color ID directly (e.g., "1", "2", "3")
+
+If no color is specified or if the color name doesn't match any known color, the default color blue (1) will be used.
 
 ## Usage Flow
 
@@ -107,4 +124,9 @@ Typical usage flow:
 - Always check authentication before performing actions
 - For email replies, always get user confirmation before sending
 - Use resources to get rich context for more intelligent interactions
-- Refer to the appropriate guides when users need help 
+- Refer to the appropriate guides when users need help
+- When creating calendar events, you can use color names (e.g., "red", "blue") instead of color IDs - the conversion happens automatically in the tool, with blue (1) as the default if no color is specified or recognized
+- The calendar tools now include better date/time parsing that works across multiple languages
+- Calendar events include the current date/time in the response for better context awareness
+- The calendar functionality has been streamlined for better performance and maintainability
+- When creating calendar events, the current user is always added automatically as an attendee 

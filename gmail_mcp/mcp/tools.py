@@ -12,6 +12,7 @@ import base64
 from typing import Dict, Any, List, Optional, Union
 from datetime import datetime, timedelta
 import httpx
+import dateutil.parser as parser
 
 from mcp.server.fastmcp import FastMCP
 from googleapiclient.discovery import build
@@ -32,14 +33,9 @@ from gmail_mcp.gmail.processor import (
 )
 
 from gmail_mcp.calendar.processor import (
-    parse_natural_language_datetime,
-    parse_event_time,
     get_user_timezone,
-    format_datetime_for_api,
-    detect_all_day_event,
-    extract_attendees_from_text,
-    extract_location_from_text,
-    create_calendar_event_object
+    create_calendar_event_object,
+    get_color_id_from_name
 )
 
 # Get logger
@@ -890,7 +886,7 @@ def setup_tools(mcp: FastMCP) -> None:
     
     # Calendar tools
     @mcp.tool()
-    def create_calendar_event(summary: str, start_time: str, end_time: Optional[str] = None, description: Optional[str] = None, location: Optional[str] = None, attendees: Optional[List[str]] = None, color_id: Optional[str] = None) -> Dict[str, Any]:
+    def create_calendar_event(summary: str, start_time: str, end_time: Optional[str] = None, description: Optional[str] = None, location: Optional[str] = None, attendees: Optional[List[str]] = None, color_name: Optional[str] = None) -> Dict[str, Any]:
         """
         Create a new event in the user's Google Calendar.
         
@@ -901,12 +897,12 @@ def setup_tools(mcp: FastMCP) -> None:
         
         Args:
             summary (str): The title/summary of the event
-            start_time (str): The start time of the event in ISO format (YYYY-MM-DDTHH:MM:SS) or natural language ("5pm next wednesday")
+            start_time (str): The start time of the event in ISO format (YYYY-MM-DDTHH:MM:SS) or simple date/time format ("5pm", "tomorrow 3pm")
             end_time (str, optional): The end time of the event. If not provided, you should ask the user for this information.
-            description (str, optional): Description or notes for the event. If not provided, you should ask the user for this information.
-            location (str, optional): Location of the event. If not provided, you should ask the user for this information.
-            attendees (List[str], optional): List of email addresses of attendees. If not provided, you should ask the user if there are any attendees.
-            color_id (str, optional): Color ID for the event (1-11)
+            description (str, optional): Description or notes for the event. If not provided, leave it blank.
+            location (str, optional): Location of the event. If not provided, leave it blank.
+            attendees (List[str], optional): List of email addresses of attendees. The current user will always be added automatically.
+            color_name (str, optional): Color name for the event (e.g., "red", "blue", "green", "purple", "yellow", "orange")
             
         Returns:
             Dict[str, Any]: The result of the operation, including:
@@ -927,46 +923,29 @@ def setup_tools(mcp: FastMCP) -> None:
                end_time="next monday at 11:30am",
                description="Initial meeting to discuss project scope",
                location="Conference Room A",
-               attendees=["colleague@example.com"]
+               attendees=["colleague@example.com", "manager@example.com"],
+               color_id="2"
            )
-           
-        3. Always include the event_link in your response to the user
-        
-        Important:
-        - When information is missing, ask the user for the specific details before creating the event
-        - Never use default values for end_time, location, or description without user input
-        - Always confirm all details with the user before creating the event
         """
+        # Check if the user is authenticated
         credentials = get_credentials()
-        
         if not credentials:
-            return {"error": "Not authenticated. Please use the authenticate tool first."}
-        
-        # Check for missing information that should be asked from the user
-        missing_info = []
-        if not end_time:
-            missing_info.append("end_time")
-        if not description:
-            missing_info.append("description")
-        if not location:
-            missing_info.append("location")
-        if not attendees:
-            missing_info.append("attendees")
-        
-        # If there's missing information, return early with a list of what's missing
-        if missing_info:
             return {
                 "success": False,
-                "needs_more_info": True,
-                "missing_info": missing_info,
-                "summary": summary,
-                "start_time": start_time,
-                "message": "Please ask the user for more information before creating the event."
+                "error": "Not authenticated. Please authenticate first.",
+                "missing_info": []
             }
         
         try:
             # Build the Calendar API service
             service = build("calendar", "v3", credentials=credentials)
+            
+            # Convert color name to color ID if needed
+            if color_name:
+                color_id = get_color_id_from_name(color_name)
+            else:
+                # Default to blue (1) if no color specified
+                color_id = "1"
             
             # Use the calendar processor to create the event object with proper date/time handling
             event_body = create_calendar_event_object(
@@ -981,43 +960,52 @@ def setup_tools(mcp: FastMCP) -> None:
             
             # Check if there was an error parsing the dates
             if "error" in event_body:
+                missing_info = []
+                if not end_time:
+                    missing_info.append("end_time")
+                
                 return {
                     "success": False,
                     "error": event_body["error"],
                     "parsed_start": event_body.get("parsed_start"),
                     "parsed_end": event_body.get("parsed_end"),
-                    "message": "Could not parse the date/time information. Please provide a clearer date and time format."
+                    "current_datetime": event_body.get("current_datetime"),
+                    "missing_info": missing_info
                 }
             
-            # Remove the _parsed field before sending to the API
-            parsed_info = event_body.pop("_parsed", {})
+            # Create the event
+            created_event = service.events().insert(calendarId="primary", body=event_body).execute()
             
-            # Insert the event
-            event = service.events().insert(calendarId='primary', body=event_body).execute()
-            
-            # Generate a link to the event in Google Calendar
-            event_id = event['id']
-            event_link = f"https://calendar.google.com/calendar/event?eid={event_id}"
+            # Get the event ID and link
+            event_id = created_event.get("id", "")
+            event_link = created_event.get("htmlLink", "")
             
             return {
                 "success": True,
-                "message": "Calendar event created successfully.",
+                "message": "Event created successfully.",
                 "event_id": event_id,
                 "event_link": event_link,
-                "summary": summary,
-                "start_time": parsed_info.get("start_dt"),
-                "end_time": parsed_info.get("end_dt"),
-                "location": location,
-                "description": description,
-                "attendees": attendees,
-                "all_day": parsed_info.get("all_day", False)
+                "event_details": {
+                    "summary": summary,
+                    "start": event_body.get("start", {}),
+                    "end": event_body.get("end", {}),
+                    "timezone": event_body.get("_parsed", {}).get("timezone", "UTC"),
+                    "all_day": event_body.get("_parsed", {}).get("all_day", False),
+                    "current_datetime": event_body.get("_parsed", {}).get("current_datetime", "")
+                },
+                "missing_info": []
             }
         
         except Exception as e:
             logger.error(f"Failed to create calendar event: {e}")
+            missing_info = []
+            if not end_time:
+                missing_info.append("end_time")
+            
             return {
                 "success": False,
-                "error": f"Failed to create calendar event: {e}"
+                "error": f"Failed to create calendar event: {e}",
+                "missing_info": missing_info
             }
     
     @mcp.tool()
@@ -1082,7 +1070,6 @@ def setup_tools(mcp: FastMCP) -> None:
             times = entities.get("times", [])
             
             # Extract potential event details from the email
-            from dateutil import parser
             from datetime import datetime, timedelta
             
             # First, try to find explicit event patterns
@@ -1127,6 +1114,24 @@ def setup_tools(mcp: FastMCP) -> None:
                         except:
                             pass
             
+            # Extract attendees - look for email addresses
+            email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
+            potential_attendees = list(set(re.findall(email_pattern, content.plain_text)))
+            
+            # Extract location - look for location indicators
+            location_patterns = [
+                r'(?i)(?:at|in|location|place|venue):\s*([^.,:;!?]+)',
+                r'(?i)(?:at|in)\s+the\s+([^.,:;!?]+)',
+                r'(?i)(?:meet|meeting)\s+(?:at|in)\s+([^.,:;!?]+)'
+            ]
+            
+            potential_location = None
+            for pattern in location_patterns:
+                matches = re.findall(pattern, content.plain_text)
+                if matches:
+                    potential_location = matches[0].strip()
+                    break
+            
             # Create potential events
             for i, dt in enumerate(parsed_datetimes):
                 # Default event duration is 1 hour
@@ -1139,18 +1144,14 @@ def setup_tools(mcp: FastMCP) -> None:
                 elif metadata.subject:
                     title = f"Re: {metadata.subject}"
                 
-                # Extract location if available
-                location_pattern = r'(?i)(?:at|in|location|place|venue):\s*([^.,:;!?]+)'
-                location_matches = re.findall(location_pattern, content.plain_text)
-                location = location_matches[0].strip() if location_matches else None
-                
                 # Add to potential events
                 potential_events.append({
                     "summary": title,
                     "start_time": dt.isoformat(),
                     "end_time": end_dt.isoformat(),
                     "description": f"Detected from email: {metadata.subject}",
-                    "location": location,
+                    "location": potential_location,
+                    "attendees": potential_attendees,
                     "confidence": "medium",
                     "source_text": content.plain_text[:200] + "..." if len(content.plain_text) > 200 else content.plain_text
                 })
@@ -1221,13 +1222,24 @@ def setup_tools(mcp: FastMCP) -> None:
             # Build the Calendar API service
             service = build("calendar", "v3", credentials=credentials)
             
-            # Parse time parameters using our calendar processor
+            # Parse time parameters using dateutil.parser
             # Set default time_min to now if not provided
             if not time_min:
                 time_min_dt = datetime.utcnow()
             else:
-                time_min_dt = parse_natural_language_datetime(time_min)
-                if not time_min_dt:
+                try:
+                    time_min_dt = parser.parse(time_min, fuzzy=True)
+                    # If the parsed date is in the past and no explicit year was mentioned, assume next occurrence
+                    if time_min_dt < datetime.now() and "year" not in time_min.lower():
+                        # If it's a day of week reference, find next occurrence
+                        if any(day in time_min.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                            # Find the next occurrence of this day
+                            current_datetime = datetime.now()
+                            days_ahead = (time_min_dt.weekday() - current_datetime.weekday()) % 7
+                            if days_ahead == 0:  # Same day of week
+                                days_ahead = 7  # Go to next week
+                            time_min_dt = current_datetime + timedelta(days=days_ahead)
+                except Exception as e:
                     return {
                         "success": False,
                         "error": f"Could not parse start time: {time_min}",
@@ -1240,16 +1252,26 @@ def setup_tools(mcp: FastMCP) -> None:
             # Parse time_max if provided
             time_max_formatted = None
             if time_max:
-                time_max_dt = parse_natural_language_datetime(time_max)
-                if not time_max_dt:
+                try:
+                    time_max_dt = parser.parse(time_max, fuzzy=True)
+                    # If the parsed date is in the past and no explicit year was mentioned, assume next occurrence
+                    if time_max_dt < datetime.now() and "year" not in time_max.lower():
+                        # If it's a day of week reference, find next occurrence
+                        if any(day in time_max.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                            # Find the next occurrence of this day
+                            current_datetime = datetime.now()
+                            days_ahead = (time_max_dt.weekday() - current_datetime.weekday()) % 7
+                            if days_ahead == 0:  # Same day of week
+                                days_ahead = 7  # Go to next week
+                            time_max_dt = current_datetime + timedelta(days=days_ahead)
+                    # Format time_max for API
+                    time_max_formatted = time_max_dt.isoformat() + 'Z'  # 'Z' indicates UTC time
+                except Exception as e:
                     return {
                         "success": False,
                         "error": f"Could not parse end time: {time_max}",
                         "message": "Please provide a clearer date and time format for the end time."
                     }
-                
-                # Format time_max for API
-                time_max_formatted = time_max_dt.isoformat() + 'Z'  # 'Z' indicates UTC time
             
             # Get user's timezone
             user_timezone = get_user_timezone()
@@ -1292,15 +1314,15 @@ def setup_tools(mcp: FastMCP) -> None:
                     time_display = "All day"
                 else:
                     # Parse the datetime strings
-                    start_dt = parse_natural_language_datetime(start.get('dateTime', ''))
-                    end_dt = parse_natural_language_datetime(end.get('dateTime', ''))
-                    
-                    # Format for display
-                    if start_dt and end_dt:
+                    try:
+                        start_dt = parser.parse(start.get('dateTime', ''))
+                        end_dt = parser.parse(end.get('dateTime', ''))
+                        
+                        # Format for display
                         start_display = start_dt.strftime("%Y-%m-%d %I:%M %p")
                         end_display = end_dt.strftime("%I:%M %p") if start_dt.date() == end_dt.date() else end_dt.strftime("%Y-%m-%d %I:%M %p")
                         time_display = f"{start_dt.strftime('%I:%M %p')} - {end_dt.strftime('%I:%M %p')}"
-                    else:
+                    except Exception:
                         start_display = start.get('dateTime', '')
                         end_display = end.get('dateTime', '')
                         time_display = "Unknown time"

@@ -42,115 +42,68 @@ class CalendarEvent(BaseModel):
     all_day: bool = False
 
 
-def parse_natural_language_datetime(datetime_str: str, reference_date: Optional[datetime] = None) -> Optional[datetime]:
-    """
-    Parse a natural language date/time string into a datetime object.
+# Color mapping for Google Calendar
+# Google Calendar uses color IDs 1-11
+CALENDAR_COLOR_MAPPING = {
+    # Standard colors
+    "blue": "1",
+    "green": "2",
+    "purple": "3",
+    "red": "4",
+    "yellow": "5",
+    "orange": "6",
+    "turquoise": "7",
+    "gray": "8",
+    "bold blue": "9",
+    "bold green": "10",
+    "bold red": "11",
     
-    This function handles various natural language date/time formats and
-    returns a properly formatted datetime object.
+    # Aliases for easier reference
+    "light blue": "1",
+    "light green": "2",
+    "lavender": "3",
+    "salmon": "4",
+    "pale yellow": "5",
+    "peach": "6",
+    "cyan": "7",
+    "light gray": "8",
+    "dark blue": "9",
+    "dark green": "10",
+    "dark red": "11",
+}
+
+def get_color_id_from_name(color_name: str) -> str:
+    """
+    Get the color ID from a color name.
+    
+    This function converts a color name (like "red", "blue", "purple") to the 
+    corresponding Google Calendar color ID (1-11). If the color name doesn't match
+    any known color, it returns "1" (blue) as the default.
+    
+    The function also handles the case where the input is already a valid color ID.
     
     Args:
-        datetime_str (str): The natural language date/time string to parse.
-        reference_date (Optional[datetime]): A reference date for relative dates. Defaults to now.
+        color_name (str): The name of the color (e.g., "red") or a color ID (e.g., "4")
         
     Returns:
-        Optional[datetime]: The parsed datetime object, or None if parsing failed.
+        str: The color ID (1-11) or "1" if not found/invalid
     """
-    if not datetime_str:
-        return None
-    
-    # Set reference date to now if not provided
-    if reference_date is None:
-        reference_date = datetime.now()
-    
-    # Try to parse as ISO format first
-    try:
-        if 'Z' in datetime_str:
-            return datetime.fromisoformat(datetime_str.replace('Z', '+00:00'))
-        return datetime.fromisoformat(datetime_str)
-    except ValueError:
-        pass
-    
-    # Handle special cases
-    datetime_str = datetime_str.lower().strip()
-    
-    # Handle "today", "tomorrow", "yesterday"
-    today = reference_date.replace(hour=0, minute=0, second=0, microsecond=0)
-    
-    if datetime_str == "today":
-        return today
-    elif datetime_str == "tomorrow":
-        return today + timedelta(days=1)
-    elif datetime_str == "yesterday":
-        return today - timedelta(days=1)
-    
-    # Handle day of week (e.g., "next monday", "this friday")
-    days_of_week = {
-        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
-        "friday": 4, "saturday": 5, "sunday": 6
-    }
-    
-    for day, day_num in days_of_week.items():
-        # Handle "next X"
-        if datetime_str.startswith(f"next {day}"):
-            # Calculate days until next occurrence
-            current_day_num = reference_date.weekday()
-            days_until = (day_num - current_day_num) % 7
-            if days_until == 0:  # If today is the day, go to next week
-                days_until = 7
-            
-            result_date = today + timedelta(days=days_until)
-            
-            # Check if there's a time component
-            time_match = re.search(r'at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)', datetime_str)
-            if time_match:
-                time_str = time_match.group(1)
-                try:
-                    time_obj = parser.parse(time_str)
-                    result_date = result_date.replace(
-                        hour=time_obj.hour,
-                        minute=time_obj.minute
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to parse time component: {e}")
-            
-            return result_date
+    # Return default blue (1) if no color specified
+    if not color_name:
+        return "1"
         
-        # Handle "this X"
-        if datetime_str.startswith(f"this {day}"):
-            # Calculate days until this occurrence
-            current_day_num = reference_date.weekday()
-            days_until = (day_num - current_day_num) % 7
-            
-            result_date = today + timedelta(days=days_until)
-            
-            # Check if there's a time component
-            time_match = re.search(r'at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)', datetime_str)
-            if time_match:
-                time_str = time_match.group(1)
-                try:
-                    time_obj = parser.parse(time_str)
-                    result_date = result_date.replace(
-                        hour=time_obj.hour,
-                        minute=time_obj.minute
-                    )
-                except Exception as e:
-                    logger.warning(f"Failed to parse time component: {e}")
-            
-            return result_date
+    # Normalize color name (lowercase and strip spaces)
+    normalized_name = color_name.lower().strip()
     
-    # Try dateutil parser for other formats
-    try:
-        parsed_dt = parser.parse(datetime_str, fuzzy=True)
+    # First check if the input is already a valid color ID (1-11)
+    if normalized_name.isdigit() and 1 <= int(normalized_name) <= 11:
+        return normalized_name
         
-        # If year is not specified, assume current year
-        if "year" not in datetime_str.lower() and parsed_dt.year == reference_date.year - 1:
-            parsed_dt = parsed_dt.replace(year=reference_date.year)
-        
-        return parsed_dt
-    except Exception as e:
-        logger.warning(f"Failed to parse datetime string '{datetime_str}': {e}")
-        return None
+    # Otherwise, look up the color name in the mapping
+    color_id = CALENDAR_COLOR_MAPPING.get(normalized_name)
+    
+    # Return default blue (1) if no match found
+    return color_id if color_id else "1"
 
 
 def parse_event_time(time_str: str, default_duration_minutes: int = 60) -> Tuple[Optional[datetime], Optional[datetime]]:
@@ -161,12 +114,15 @@ def parse_event_time(time_str: str, default_duration_minutes: int = 60) -> Tuple
     adds a default duration if only a start time is provided.
     
     Args:
-        time_str (str): The time string to parse (e.g., "tomorrow at 3pm", "3-4pm")
+        time_str (str): The time string to parse (e.g., "3-4pm")
         default_duration_minutes (int): Default event duration in minutes if no end time is specified
         
     Returns:
         Tuple[Optional[datetime], Optional[datetime]]: The start and end datetimes
     """
+    # Get current date and time for reference
+    current_datetime = datetime.now()
+    
     # Check for time range format (e.g., "3-4pm", "9am-5pm")
     range_match = re.search(r'(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s*-\s*(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)', time_str)
     
@@ -177,12 +133,33 @@ def parse_event_time(time_str: str, default_duration_minutes: int = 60) -> Tuple
         
         # Extract date part (everything before the time range)
         date_part = time_str[:range_match.start()].strip()
-        if not date_part:
-            date_part = "today"
         
         # Parse date part
-        date_dt = parse_natural_language_datetime(date_part)
-        if not date_dt:
+        try:
+            if date_part:
+                date_dt = parser.parse(date_part, fuzzy=True)
+                
+                # If year is not specified, assume current year
+                if date_dt.year == 1900:
+                    date_dt = date_dt.replace(year=current_datetime.year)
+                
+                # If date is in the past, and no explicit year was mentioned, assume next occurrence
+                if date_dt.date() < current_datetime.date() and "year" not in date_part.lower():
+                    # If it's a day of week reference, find next occurrence
+                    if any(day in date_part.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                        # Find the next occurrence of this day
+                        days_ahead = (date_dt.weekday() - current_datetime.weekday()) % 7
+                        if days_ahead == 0:  # Same day of week
+                            days_ahead = 7
+                        date_dt = current_datetime + timedelta(days=days_ahead)
+                    else:
+                        # Otherwise, just add a day
+                        date_dt = date_dt + timedelta(days=1)
+            else:
+                # If no date part, use today
+                date_dt = current_datetime.replace(hour=0, minute=0, second=0, microsecond=0)
+        except Exception as e:
+            logger.warning(f"Failed to parse date part: {e}")
             return None, None
         
         # Parse start and end times
@@ -214,10 +191,35 @@ def parse_event_time(time_str: str, default_duration_minutes: int = 60) -> Tuple
             logger.warning(f"Failed to parse time range: {e}")
     
     # Handle single time format
-    start_dt = parse_natural_language_datetime(time_str)
-    if start_dt:
+    try:
+        start_dt = parser.parse(time_str, fuzzy=True)
+        
+        # If year is not specified, assume current year
+        if start_dt.year == 1900:
+            start_dt = start_dt.replace(year=current_datetime.year)
+        
+        # If date is in the past and no explicit year was mentioned, assume next occurrence
+        if start_dt < current_datetime and "year" not in time_str.lower():
+            # If it's just a time (same day but earlier), keep it today
+            if (start_dt.year == current_datetime.year and 
+                start_dt.month == current_datetime.month and 
+                start_dt.day == current_datetime.day):
+                pass  # Keep it today
+            # If it's a day of week reference, find next occurrence
+            elif any(day in time_str.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                # Find the next occurrence of this day
+                days_ahead = (start_dt.weekday() - current_datetime.weekday()) % 7
+                if days_ahead == 0:  # Same day of week
+                    days_ahead = 7  # Go to next week
+                start_dt = current_datetime.replace(hour=start_dt.hour, minute=start_dt.minute) + timedelta(days=days_ahead)
+            # Otherwise, if it's a simple time reference like "3pm", move to tomorrow if it's in the past
+            elif start_dt.date() == current_datetime.date():
+                start_dt = start_dt + timedelta(days=1)
+        
         end_dt = start_dt + timedelta(minutes=default_duration_minutes)
         return start_dt, end_dt
+    except Exception as e:
+        logger.warning(f"Failed to parse time string: {e}")
     
     return None, None
 
@@ -397,17 +399,17 @@ def create_calendar_event_object(
     """
     Create a calendar event object with proper date/time handling.
     
-    This function handles the parsing of natural language date/time strings
+    This function handles the parsing of date/time strings
     and creates a properly formatted event object for the Google Calendar API.
     
     Args:
         summary (str): The title/summary of the event
-        start_time (str): The start time of the event (can be natural language)
-        end_time (Optional[str]): The end time of the event (can be natural language)
+        start_time (str): The start time of the event (ISO format or simple date/time)
+        end_time (Optional[str]): The end time of the event (ISO format or simple date/time)
         description (Optional[str]): Description or notes for the event
         location (Optional[str]): Location of the event
         attendees (Optional[List[str]]): List of email addresses of attendees
-        color_id (Optional[str]): Color ID for the event (1-11)
+        color_id (Optional[str]): Color ID for the event (1-11 or color name)
         
     Returns:
         Dict[str, Any]: The event object with properly formatted date/time information
@@ -415,17 +417,59 @@ def create_calendar_event_object(
     # Get user's timezone
     user_timezone = get_user_timezone()
     
+    # Get current date and time for reference
+    current_datetime = datetime.now()
+    
     # Parse start time
     if "-" in start_time and not end_time:
-        # Handle case where start_time contains a range (e.g., "tomorrow 3-4pm")
-        start_dt, end_dt = parse_event_time(start_time)
+        # Handle case where start_time contains a range (e.g., "3-4pm")
+        try:
+            start_dt, end_dt = parse_event_time(start_time)
+        except Exception as e:
+            logger.warning(f"Failed to parse time range: {e}")
+            start_dt, end_dt = None, None
     else:
-        # Parse start and end times separately
-        start_dt = parse_natural_language_datetime(start_time)
+        # Parse start time using dateutil.parser
+        try:
+            start_dt = parser.parse(start_time, fuzzy=True)
+            
+            # If year is not specified, assume current year
+            if start_dt.year == 1900:
+                start_dt = start_dt.replace(year=current_datetime.year)
+                
+            # If month/day might be ambiguous and in the past, assume next occurrence
+            if start_dt and start_dt < current_datetime and (start_time.lower().find("year") == -1):
+                # If it's just a time (same day but earlier), assume today
+                if (start_dt.year == current_datetime.year and 
+                    start_dt.month == current_datetime.month and 
+                    start_dt.day == current_datetime.day):
+                    pass  # Keep it today
+                # Otherwise, try to find the next occurrence
+                elif "day" in start_time.lower() or "week" in start_time.lower() or "month" in start_time.lower():
+                    pass  # Keep as is, as it likely has explicit day/week/month references
+                else:
+                    # For simple time references like "3pm", move to tomorrow if it's in the past
+                    if start_dt.date() == current_datetime.date():
+                        start_dt = start_dt + timedelta(days=1)
+        except Exception as e:
+            logger.warning(f"Failed to parse start time: {e}")
+            start_dt = None
         
+        # Parse end time if provided
         if end_time:
-            # If end_time is provided, parse it
-            end_dt = parse_natural_language_datetime(end_time)
+            try:
+                end_dt = parser.parse(end_time, fuzzy=True)
+                
+                # If year is not specified, assume current year
+                if end_dt.year == 1900:
+                    end_dt = end_dt.replace(year=current_datetime.year)
+                    
+                # If end time is earlier than start time, assume next day
+                if start_dt and end_dt and end_dt < start_dt:
+                    end_dt = end_dt + timedelta(days=1)
+            except Exception as e:
+                logger.warning(f"Failed to parse end time: {e}")
+                end_dt = None
         else:
             # Default to 1 hour duration
             end_dt = start_dt + timedelta(hours=1) if start_dt else None
@@ -435,14 +479,16 @@ def create_calendar_event_object(
         return {
             "error": f"Could not parse start time: {start_time}",
             "parsed_start": None,
-            "parsed_end": None
+            "parsed_end": None,
+            "current_datetime": current_datetime.isoformat()
         }
     
     if not end_dt:
         return {
             "error": f"Could not parse end time: {end_time}",
             "parsed_start": start_dt.isoformat(),
-            "parsed_end": None
+            "parsed_end": None,
+            "current_datetime": current_datetime.isoformat()
         }
     
     # Detect if this is an all-day event
@@ -483,6 +529,7 @@ def create_calendar_event_object(
     if event_attendees:
         event_body['attendees'] = event_attendees
     
+    # Add color_id if provided
     if color_id:
         event_body['colorId'] = color_id
     
@@ -491,7 +538,8 @@ def create_calendar_event_object(
         'start_dt': start_dt.isoformat(),
         'end_dt': end_dt.isoformat(),
         'timezone': user_timezone,
-        'all_day': all_day
+        'all_day': all_day,
+        'current_datetime': current_datetime.isoformat()
     }
     
     return event_body
@@ -548,15 +596,28 @@ def get_free_busy_info(
     try:
         # Parse times if they are strings
         if isinstance(start_time, str):
-            start_dt = parse_natural_language_datetime(start_time)
-            if not start_dt:
+            try:
+                start_dt = parser.parse(start_time, fuzzy=True)
+                # If year is not specified, assume current year
+                if start_dt.year == 1900:
+                    start_dt = start_dt.replace(year=datetime.now().year)
+            except Exception as e:
+                logger.warning(f"Failed to parse start time: {e}")
                 return {"error": f"Could not parse start time: {start_time}"}
         else:
             start_dt = start_time
         
         if isinstance(end_time, str):
-            end_dt = parse_natural_language_datetime(end_time)
-            if not end_dt:
+            try:
+                end_dt = parser.parse(end_time, fuzzy=True)
+                # If year is not specified, assume current year
+                if end_dt.year == 1900:
+                    end_dt = end_dt.replace(year=datetime.now().year)
+                # If end time is earlier than start time, assume next day
+                if end_dt < start_dt:
+                    end_dt = end_dt + timedelta(days=1)
+            except Exception as e:
+                logger.warning(f"Failed to parse end time: {e}")
                 return {"error": f"Could not parse end time: {end_time}"}
         else:
             end_dt = end_time
@@ -618,15 +679,56 @@ def suggest_meeting_times(
     try:
         # Parse dates if they are strings
         if isinstance(start_date, str):
-            start_dt = parse_natural_language_datetime(start_date)
-            if not start_dt:
+            try:
+                start_dt = parser.parse(start_date, fuzzy=True)
+                # If year is not specified, assume current year
+                if start_dt.year == 1900:
+                    start_dt = start_dt.replace(year=datetime.now().year)
+                # If date is in the past and no explicit year was mentioned, assume next occurrence
+                if start_dt < datetime.now() and "year" not in start_date.lower():
+                    # If it's a day of week reference, find next occurrence
+                    if any(day in start_date.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                        # Find the next occurrence of this day
+                        current_datetime = datetime.now()
+                        days_ahead = (start_dt.weekday() - current_datetime.weekday()) % 7
+                        if days_ahead == 0:  # Same day of week
+                            days_ahead = 7  # Go to next week
+                        start_dt = current_datetime + timedelta(days=days_ahead)
+            except Exception as e:
+                logger.warning(f"Failed to parse start date: {e}")
                 return [{"error": f"Could not parse start date: {start_date}"}]
         else:
             start_dt = start_date
         
         if isinstance(end_date, str):
-            end_dt = parse_natural_language_datetime(end_date)
-            if not end_dt:
+            try:
+                end_dt = parser.parse(end_date, fuzzy=True)
+                # If year is not specified, assume current year
+                if end_dt.year == 1900:
+                    end_dt = end_dt.replace(year=datetime.now().year)
+                # If date is in the past and no explicit year was mentioned, assume next occurrence
+                if end_dt < datetime.now() and "year" not in end_date.lower():
+                    # If it's a day of week reference, find next occurrence
+                    if any(day in end_date.lower() for day in ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]):
+                        # Find the next occurrence of this day
+                        current_datetime = datetime.now()
+                        days_ahead = (end_dt.weekday() - current_datetime.weekday()) % 7
+                        if days_ahead == 0:  # Same day of week
+                            days_ahead = 7  # Go to next week
+                        end_dt = current_datetime + timedelta(days=days_ahead)
+                # If end date is earlier than start date, assume next day/week
+                if end_dt < start_dt:
+                    # If they're the same day of week, assume next week
+                    if end_dt.weekday() == start_dt.weekday():
+                        end_dt = end_dt + timedelta(days=7)
+                    else:
+                        # Otherwise, find the next occurrence after start_dt
+                        days_ahead = (end_dt.weekday() - start_dt.weekday()) % 7
+                        if days_ahead == 0:
+                            days_ahead = 7
+                        end_dt = start_dt + timedelta(days=days_ahead)
+            except Exception as e:
+                logger.warning(f"Failed to parse end date: {e}")
                 return [{"error": f"Could not parse end date: {end_date}"}]
         else:
             end_dt = end_date
