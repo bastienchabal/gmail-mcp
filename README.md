@@ -1,4 +1,5 @@
 # Gmail MCP Server
+[![smithery badge](https://smithery.ai/badge/@bastienchabal/gmail-mcp)](https://smithery.ai/server/@bastienchabal/gmail-mcp)
 
 A Model Context Protocol (MCP) server for Gmail & Google Calendar integration with Claude Desktop, enabling intelligent, context-aware interactions with your email.
 
@@ -22,6 +23,15 @@ A Model Context Protocol (MCP) server for Gmail & Google Calendar integration wi
 
 ### Installation
 
+#### Installing via Smithery
+
+To install Gmail Integration Server for Claude Desktop automatically via [Smithery](https://smithery.ai/server/@bastienchabal/gmail-mcp):
+
+```bash
+npx -y @smithery/cli install @bastienchabal/gmail-mcp --client claude
+```
+
+#### Installing Manually
 1. Clone this repository:
    ```bash
    git clone https://github.com/bastienchabal/gmail-mcp.git
